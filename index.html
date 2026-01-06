@@ -13,7 +13,21 @@
 <body>
   <div id="game"></div>
 
+  <!-- Phaser CDN -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-  <script src="./main.js"></script>
+  
+  <!-- Game Systems (load before scenes) -->
+  <script src="./js/StorageManager.js"></script>
+  <script src="./js/DifficultyManager.js"></script>
+  
+  <!-- Scene Classes (load before config) -->
+  <script src="./js/scenes/BootScene.js"></script>
+  <script src="./js/scenes/MenuScene.js"></script>
+  <script src="./js/scenes/GameScene.js"></script>
+  <script src="./js/scenes/UIScene.js"></script>
+  <script src="./js/scenes/GameOverScene.js"></script>
+  
+  <!-- Config & Game Start (load last) -->
+  <script src="./js/config.js"></script>
 </body>
 </html>
