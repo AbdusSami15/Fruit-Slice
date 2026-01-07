@@ -14,8 +14,6 @@ class GameOverScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
 
     // Semi-transparent overlay
     this.overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
@@ -26,13 +24,13 @@ class GameOverScene extends Phaser.Scene {
     this.container.setDepth(2100);
 
     // Panel background
-    const panel = this.add.rectangle(0, 0, s(380), s(340), 0x111827, 1);
-    panel.setStrokeStyle(s(3), 0xffffff, 0.15);
+    const panel = this.add.rectangle(0, 0, 480, 480, 0x111827, 1);
+    panel.setStrokeStyle(4, 0xffffff, 0.15);
 
     // Game Over title
-    const title = this.add.text(0, -s(120), "GAME OVER", {
+    const title = this.add.text(0, -160, "GAME OVER", {
       fontFamily: "Arial Black",
-      fontSize: fs(40) + "px",
+      fontSize: "52px",
       color: "#ffffff"
     }).setOrigin(0.5);
 
@@ -40,22 +38,22 @@ class GameOverScene extends Phaser.Scene {
     const diffLabel = this.difficulty.charAt(0).toUpperCase() + this.difficulty.slice(1);
     const diffColors = { easy: "#52b788", normal: "#4361ee", hard: "#f72585" };
     
-    const diffText = this.add.text(0, -s(75), diffLabel.toUpperCase(), {
+    const diffText = this.add.text(0, -100, diffLabel.toUpperCase(), {
       fontFamily: "Arial Black",
-      fontSize: fs(14) + "px",
+      fontSize: "18px",
       color: diffColors[this.difficulty] || "#888888"
     }).setOrigin(0.5);
 
     // Score display
-    const scoreLabel = this.add.text(0, -s(45), "SCORE", {
+    const scoreLabel = this.add.text(0, -60, "SCORE", {
       fontFamily: "Arial",
-      fontSize: fs(16) + "px",
+      fontSize: "20px",
       color: "#888888"
     }).setOrigin(0.5);
 
-    const scoreValue = this.add.text(0, -s(10), `${this.finalScore}`, {
+    const scoreValue = this.add.text(0, -15, `${this.finalScore}`, {
       fontFamily: "Arial Black",
-      fontSize: fs(44) + "px",
+      fontSize: "56px",
       color: "#4cc9f0"
     }).setOrigin(0.5);
 
@@ -64,12 +62,14 @@ class GameOverScene extends Phaser.Scene {
     let bestScoreContent = [];
     
     if (this.isNewBest && this.finalScore > 0) {
-      const newBestText = this.add.text(0, s(35), "🏆 NEW BEST! 🏆", {
+      // New best animation
+      const newBestText = this.add.text(0, 45, "🏆 NEW BEST! 🏆", {
         fontFamily: "Arial Black",
-        fontSize: fs(20) + "px",
+        fontSize: "26px",
         color: "#ffc300"
       }).setOrigin(0.5);
       
+      // Pulse animation
       this.tweens.add({
         targets: newBestText,
         scale: { from: 1, to: 1.15 },
@@ -78,12 +78,21 @@ class GameOverScene extends Phaser.Scene {
         repeat: -1,
         ease: "Sine.easeInOut"
       });
+
+      // Sparkle effect
+      this.tweens.add({
+        targets: newBestText,
+        alpha: { from: 1, to: 0.7 },
+        duration: 200,
+        yoyo: true,
+        repeat: -1
+      });
       
       bestScoreContent.push(newBestText);
     } else {
-      const bestText = this.add.text(0, s(35), `Best: ${bestScore}`, {
+      const bestText = this.add.text(0, 45, `Best: ${bestScore}`, {
         fontFamily: "Arial",
-        fontSize: fs(14) + "px",
+        fontSize: "18px",
         color: "#666666"
       }).setOrigin(0.5);
       
@@ -91,12 +100,12 @@ class GameOverScene extends Phaser.Scene {
     }
 
     // Restart button
-    const restartBtn = this.createButton(0, s(90), "PLAY AGAIN", 0xf72585, () => {
+    const restartBtn = this.createButton(0, 120, "PLAY AGAIN", 0xf72585, () => {
       this.restartGame();
     });
 
     // Home button
-    const homeBtn = this.createButton(0, s(145), "MAIN MENU", 0x4361ee, () => {
+    const homeBtn = this.createButton(0, 195, "MAIN MENU", 0x4361ee, () => {
       this.goToMenu();
     });
 
@@ -119,18 +128,14 @@ class GameOverScene extends Phaser.Scene {
   }
 
   createButton(x, y, label, color, onClick) {
-    const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
     const container = this.add.container(x, y);
 
-    const bg = this.add.rectangle(0, 0, s(220), s(44), color, 1);
-    bg.setStrokeStyle(s(2), 0xffffff, 0.25);
+    const bg = this.add.rectangle(0, 0, 280, 60, color, 1);
+    bg.setStrokeStyle(3, 0xffffff, 0.25);
 
     const txt = this.add.text(0, 0, label, {
       fontFamily: "Arial Black",
-      fontSize: fs(18) + "px",
+      fontSize: "24px",
       color: "#ffffff"
     }).setOrigin(0.5);
 
@@ -161,10 +166,12 @@ class GameOverScene extends Phaser.Scene {
   goToMenu() {
     this.cameras.main.fadeOut(200, 11, 15, 20);
     this.cameras.main.once("camerafadeoutcomplete", () => {
+      // Exit fullscreen when returning to menu
       if (this.scale.isFullscreen) {
         this.scale.stopFullscreen();
       }
       
+      // Unlock orientation
       if (screen.orientation && screen.orientation.unlock) {
         screen.orientation.unlock();
       }
@@ -187,3 +194,4 @@ class GameOverScene extends Phaser.Scene {
     this.scale.off("resize", this.handleResize, this);
   }
 }
+

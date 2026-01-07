@@ -8,8 +8,6 @@ class MenuScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
 
     // Background
     this.cameras.main.setBackgroundColor("#0b0f14");
@@ -18,50 +16,44 @@ class MenuScene extends Phaser.Scene {
     this.createBackgroundDecorations();
 
     // Title (side by side for landscape)
-    this.titleFruit = this.add.text(width / 2 - s(10), height * 0.15, "FRUIT", {
+    this.add.text(width / 2 - 10, height * 0.18, "FRUIT", {
       fontFamily: "Arial Black",
-      fontSize: fs(52) + "px",
+      fontSize: "64px",
       color: "#ff4d6d"
     }).setOrigin(1, 0.5);
 
-    this.titleSlice = this.add.text(width / 2 + s(10), height * 0.15, "SLICE", {
+    this.add.text(width / 2 + 10, height * 0.18, "SLICE", {
       fontFamily: "Arial Black",
-      fontSize: fs(52) + "px",
+      fontSize: "64px",
       color: "#4cc9f0"
     }).setOrigin(0, 0.5);
 
     // Subtitle
-    this.subtitle = this.add.text(width / 2, height * 0.28, "Swipe to slice!", {
+    this.add.text(width / 2, height * 0.32, "Swipe to slice!", {
       fontFamily: "Arial",
-      fontSize: fs(18) + "px",
+      fontSize: "22px",
       color: "#888888"
     }).setOrigin(0.5);
 
-    // Best score display
-    this.bestScoreText = this.add.text(width / 2, height * 0.40, "", {
+    // Best score display (updates when difficulty changes)
+    this.bestScoreText = this.add.text(width / 2, height * 0.44, "", {
       fontFamily: "Arial Black",
-      fontSize: fs(18) + "px",
+      fontSize: "22px",
       color: "#ffc300"
     }).setOrigin(0.5);
     
     this.updateBestScoreDisplay();
 
     // Difficulty selection
-    this.createDifficultySelector(width / 2, height * 0.55);
+    this.createDifficultySelector(width / 2, height * 0.58);
 
     // Start button
-    this.startBtn = this.createButton(
-      width / 2, 
-      height * 0.75, 
-      "START GAME", 
-      s(220), 
-      s(50), 
-      0xf72585, 
-      () => this.startGame()
-    );
+    this.createButton(width / 2, height * 0.78, "START GAME", 280, 65, 0xf72585, () => {
+      this.startGame();
+    });
 
     // Sound toggle
-    this.createSoundToggle(width - s(40), s(40));
+    this.createSoundToggle(width - 50, 50);
 
     // Animate entrance
     this.animateEntrance();
@@ -72,23 +64,21 @@ class MenuScene extends Phaser.Scene {
 
   createBackgroundDecorations() {
     const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
     
+    // Add some floating fruit silhouettes in background
     const colors = [0xff4d6d, 0x52b788, 0xffc300, 0x9d4edd];
-    this.bgCircles = [];
     
-    for (let i = 0; i < 6; i++) {
-      const x = Phaser.Math.Between(s(50), width - s(50));
-      const y = Phaser.Math.Between(s(50), height - s(50));
+    for (let i = 0; i < 8; i++) {
+      const x = Phaser.Math.Between(50, width - 50);
+      const y = Phaser.Math.Between(50, height - 50);
       const color = Phaser.Utils.Array.GetRandom(colors);
-      const radius = s(Phaser.Math.Between(12, 28));
       
-      const circle = this.add.circle(x, y, radius, color, 0.08);
-      this.bgCircles.push(circle);
+      const circle = this.add.circle(x, y, Phaser.Math.Between(15, 35), color, 0.08);
       
+      // Gentle floating animation
       this.tweens.add({
         targets: circle,
-        y: y + s(Phaser.Math.Between(-20, 20)),
+        y: y + Phaser.Math.Between(-30, 30),
         duration: Phaser.Math.Between(2000, 4000),
         yoyo: true,
         repeat: -1,
@@ -98,10 +88,6 @@ class MenuScene extends Phaser.Scene {
   }
 
   createDifficultySelector(x, y) {
-    const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
     const difficulties = ["easy", "normal", "hard"];
     const labels = ["EASY", "NORMAL", "HARD"];
     const colors = [0x52b788, 0x4361ee, 0xf72585];
@@ -110,13 +96,13 @@ class MenuScene extends Phaser.Scene {
     const currentDifficulty = this.registry.get("difficulty") || "normal";
     
     // Label
-    this.diffLabel = this.add.text(x, y - s(35), "Difficulty", {
+    this.add.text(x, y - 45, "Difficulty", {
       fontFamily: "Arial",
-      fontSize: fs(16) + "px",
+      fontSize: "20px",
       color: "#666666"
     }).setOrigin(0.5);
 
-    const spacing = s(110);
+    const spacing = 140;  // Wider spacing for landscape
     const startX = x - spacing;
 
     for (let i = 0; i < difficulties.length; i++) {
@@ -125,12 +111,12 @@ class MenuScene extends Phaser.Scene {
       
       const container = this.add.container(btnX, y);
       
-      const bg = this.add.rectangle(0, 0, s(80), s(36), colors[i], isSelected ? 1 : 0.3);
-      bg.setStrokeStyle(s(2), colors[i], 1);
+      const bg = this.add.rectangle(0, 0, 95, 45, colors[i], isSelected ? 1 : 0.3);
+      bg.setStrokeStyle(2, colors[i], 1);
       
       const txt = this.add.text(0, 0, labels[i], {
         fontFamily: "Arial Black",
-        fontSize: fs(12) + "px",
+        fontSize: "14px",
         color: "#ffffff"
       }).setOrigin(0.5);
       
@@ -159,6 +145,7 @@ class MenuScene extends Phaser.Scene {
   selectDifficulty(difficulty, index) {
     this.registry.set("difficulty", difficulty);
     
+    // Update button visuals
     this.difficultyButtons.forEach((btn, i) => {
       const isSelected = i === index;
       btn.isSelected = isSelected;
@@ -166,6 +153,7 @@ class MenuScene extends Phaser.Scene {
       btn.setScale(isSelected ? 1.1 : 1.0);
     });
 
+    // Update best score display for selected difficulty
     this.updateBestScoreDisplay();
   }
 
@@ -182,17 +170,14 @@ class MenuScene extends Phaser.Scene {
   }
 
   createButton(x, y, label, w, h, color, onClick) {
-    const { width, height } = this.scale;
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
     const container = this.add.container(x, y);
     
     const bg = this.add.rectangle(0, 0, w, h, color, 1);
-    bg.setStrokeStyle(2, 0xffffff, 0.25);
+    bg.setStrokeStyle(3, 0xffffff, 0.25);
     
     const txt = this.add.text(0, 0, label, {
       fontFamily: "Arial Black",
-      fontSize: fs(20) + "px",
+      fontSize: "26px",
       color: "#ffffff"
     }).setOrigin(0.5);
     
@@ -211,18 +196,15 @@ class MenuScene extends Phaser.Scene {
   }
 
   createSoundToggle(x, y) {
-    const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
     const soundEnabled = this.registry.get("soundEnabled");
     
     this.soundBtn = this.add.container(x, y);
     
-    const bg = this.add.circle(0, 0, s(22), soundEnabled ? 0x52b788 : 0x444444);
+    const bg = this.add.circle(0, 0, 28, soundEnabled ? 0x52b788 : 0x444444);
     
+    // Simple speaker icon using text
     this.soundIcon = this.add.text(0, 0, soundEnabled ? "🔊" : "🔇", {
-      fontSize: fs(18) + "px"
+      fontSize: "24px"
     }).setOrigin(0.5);
     
     this.soundBtn.add([bg, this.soundIcon]);
@@ -234,17 +216,19 @@ class MenuScene extends Phaser.Scene {
     bg.on("pointerdown", () => {
       const newState = !this.registry.get("soundEnabled");
       this.registry.set("soundEnabled", newState);
-      StorageManager.setSoundEnabled(newState);
+      StorageManager.setSoundEnabled(newState); // Persist to localStorage
       this.soundIcon.setText(newState ? "🔊" : "🔇");
       this.soundBtn.bg.setFillStyle(newState ? 0x52b788 : 0x444444);
     });
   }
 
   animateEntrance() {
+    // Fade in the scene
     this.cameras.main.fadeIn(400, 11, 15, 20);
   }
 
   startGame() {
+    // Enter fullscreen and lock to landscape on mobile
     this.enterFullscreenLandscape();
     
     this.cameras.main.fadeOut(300, 11, 15, 20);
@@ -255,18 +239,26 @@ class MenuScene extends Phaser.Scene {
   }
 
   enterFullscreenLandscape() {
-    if (this.scale.isFullscreen) return;
+    // Request fullscreen
+    if (this.scale.isFullscreen) {
+      return; // Already fullscreen
+    }
 
     this.scale.startFullscreen();
 
+    // Lock orientation to landscape on mobile
     if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock("landscape").catch(() => {});
+      screen.orientation.lock("landscape").catch(() => {
+        // Orientation lock not supported or denied - that's okay
+      });
     }
   }
 
   handleResize(gameSize) {
     const { width, height } = gameSize;
     
+    // Restart scene to re-layout elements for new size
+    // Only if size changed significantly
     if (this.lastWidth && (Math.abs(this.lastWidth - width) > 50 || Math.abs(this.lastHeight - height) > 50)) {
       this.scene.restart();
     }
@@ -278,3 +270,4 @@ class MenuScene extends Phaser.Scene {
     this.scale.off("resize", this.handleResize, this);
   }
 }
+

@@ -9,25 +9,23 @@ class UIScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
 
     // Score text
-    this.scoreText = this.add.text(s(16), s(16), "SCORE: 0", {
+    this.scoreText = this.add.text(20, 20, "SCORE: 0", {
       fontFamily: "Arial Black",
-      fontSize: fs(22) + "px",
+      fontSize: "28px",
       color: "#ffffff"
     });
 
     // Lives text
-    this.livesText = this.add.text(width - s(16), s(16), "LIVES: 3", {
+    this.livesText = this.add.text(width - 20, 20, "LIVES: 3", {
       fontFamily: "Arial Black",
-      fontSize: fs(22) + "px",
+      fontSize: "28px",
       color: "#ffffff"
     }).setOrigin(1, 0);
 
     // Pause button
-    this.createPauseButton(width - s(24), s(60));
+    this.createPauseButton(width - 30, 80);
 
     // Pause overlay (hidden initially)
     this.createPauseOverlay();
@@ -35,10 +33,10 @@ class UIScene extends Phaser.Scene {
     // Combo text (centered, hidden initially)
     this.comboText = this.add.text(width / 2, height * 0.35, "", {
       fontFamily: "Arial Black",
-      fontSize: fs(40) + "px",
+      fontSize: "52px",
       color: "#ffc300",
       stroke: "#000000",
-      strokeThickness: s(4)
+      strokeThickness: 6
     }).setOrigin(0.5).setAlpha(0).setDepth(100);
 
     // Listen for game events
@@ -52,16 +50,14 @@ class UIScene extends Phaser.Scene {
   }
 
   createPauseButton(x, y) {
-    const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-
     this.pauseBtn = this.add.container(x, y);
 
-    const bg = this.add.circle(0, 0, s(18), 0x333333, 0.8);
-    bg.setStrokeStyle(s(2), 0xffffff, 0.3);
+    const bg = this.add.circle(0, 0, 24, 0x333333, 0.8);
+    bg.setStrokeStyle(2, 0xffffff, 0.3);
 
-    const bar1 = this.add.rectangle(-s(4), 0, s(4), s(14), 0xffffff);
-    const bar2 = this.add.rectangle(s(4), 0, s(4), s(14), 0xffffff);
+    // Pause icon (two bars)
+    const bar1 = this.add.rectangle(-6, 0, 6, 18, 0xffffff);
+    const bar2 = this.add.rectangle(6, 0, 6, 18, 0xffffff);
 
     this.pauseBtn.add([bg, bar1, bar2]);
 
@@ -73,8 +69,6 @@ class UIScene extends Phaser.Scene {
 
   createPauseOverlay() {
     const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
 
     this.pauseContainer = this.add.container(width / 2, height / 2);
     this.pauseContainer.setVisible(false);
@@ -84,52 +78,51 @@ class UIScene extends Phaser.Scene {
     this.pauseBg = this.add.rectangle(0, 0, width, height, 0x000000, 0.7);
 
     // Panel
-    const panel = this.add.rectangle(0, 0, s(320), s(300), 0x111827, 1);
-    panel.setStrokeStyle(s(2), 0xffffff, 0.15);
+    const panel = this.add.rectangle(0, 0, 400, 420, 0x111827, 1);
+    panel.setStrokeStyle(3, 0xffffff, 0.15);
 
     // Title
-    const title = this.add.text(0, -s(100), "PAUSED", {
+    const title = this.add.text(0, -140, "PAUSED", {
       fontFamily: "Arial Black",
-      fontSize: fs(36) + "px",
+      fontSize: "48px",
       color: "#ffffff"
     }).setOrigin(0.5);
 
     // Sound toggle row
-    this.createPauseSoundToggle(s);
+    this.createPauseSoundToggle();
 
     // Resume button
-    const resumeBtn = this.createOverlayButton(0, s(20), "RESUME", 0x52b788, () => {
+    const resumeBtn = this.createOverlayButton(0, 20, "RESUME", 0x52b788, () => {
       this.togglePause();
     });
 
     // Home button
-    const homeBtn = this.createOverlayButton(0, s(80), "MAIN MENU", 0x4361ee, () => {
+    const homeBtn = this.createOverlayButton(0, 100, "MAIN MENU", 0x4361ee, () => {
       this.goToMenu();
     });
 
     this.pauseContainer.add([this.pauseBg, panel, title, ...resumeBtn, ...homeBtn]);
   }
 
-  createPauseSoundToggle(s) {
-    const { width, height } = this.scale;
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
+  createPauseSoundToggle() {
     const soundEnabled = this.registry.get("soundEnabled");
     
-    const soundLabel = this.add.text(-s(60), -s(40), "Sound:", {
+    // Sound label
+    const soundLabel = this.add.text(-80, -60, "Sound:", {
       fontFamily: "Arial Black",
-      fontSize: fs(16) + "px",
+      fontSize: "22px",
       color: "#888888"
     }).setOrigin(0, 0.5);
 
-    this.pauseSoundBtn = this.add.container(s(50), -s(40));
+    // Toggle button
+    this.pauseSoundBtn = this.add.container(60, -60);
     
-    const bg = this.add.rectangle(0, 0, s(80), s(32), soundEnabled ? 0x52b788 : 0x444444);
-    bg.setStrokeStyle(s(1), 0xffffff, 0.2);
+    const bg = this.add.rectangle(0, 0, 100, 40, soundEnabled ? 0x52b788 : 0x444444);
+    bg.setStrokeStyle(2, 0xffffff, 0.2);
     
     this.pauseSoundText = this.add.text(0, 0, soundEnabled ? "ON" : "OFF", {
       fontFamily: "Arial Black",
-      fontSize: fs(14) + "px",
+      fontSize: "18px",
       color: "#ffffff"
     }).setOrigin(0.5);
     
@@ -151,18 +144,14 @@ class UIScene extends Phaser.Scene {
   }
 
   createOverlayButton(x, y, label, color, onClick) {
-    const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
     const container = this.add.container(x, y);
 
-    const bg = this.add.rectangle(0, 0, s(200), s(44), color, 1);
-    bg.setStrokeStyle(s(2), 0xffffff, 0.25);
+    const bg = this.add.rectangle(0, 0, 260, 60, color, 1);
+    bg.setStrokeStyle(2, 0xffffff, 0.25);
 
     const txt = this.add.text(0, 0, label, {
       fontFamily: "Arial Black",
-      fontSize: fs(16) + "px",
+      fontSize: "22px",
       color: "#ffffff"
     }).setOrigin(0.5);
 
@@ -184,14 +173,17 @@ class UIScene extends Phaser.Scene {
     const gameScene = this.scene.get("GameScene");
     
     if (this.pauseContainer.visible) {
+      // Resume
       this.pauseContainer.setVisible(false);
       
+      // Update sound toggle state in case it changed
       const soundEnabled = this.registry.get("soundEnabled");
       this.pauseSoundText.setText(soundEnabled ? "ON" : "OFF");
       this.pauseSoundBtn.bg.setFillStyle(soundEnabled ? 0x52b788 : 0x444444);
       
       gameScene.events.emit("resume-game");
     } else {
+      // Pause - sync sound toggle state
       const soundEnabled = this.registry.get("soundEnabled");
       this.pauseSoundText.setText(soundEnabled ? "ON" : "OFF");
       this.pauseSoundBtn.bg.setFillStyle(soundEnabled ? 0x52b788 : 0x444444);
@@ -202,14 +194,17 @@ class UIScene extends Phaser.Scene {
   }
 
   goToMenu() {
+    // Exit fullscreen when returning to menu
     if (this.scale.isFullscreen) {
       this.scale.stopFullscreen();
     }
     
+    // Unlock orientation
     if (screen.orientation && screen.orientation.unlock) {
       screen.orientation.unlock();
     }
     
+    // Stop game scene and this UI scene
     this.scene.stop("GameScene");
     this.scene.stop("UIScene");
     this.scene.start("MenuScene");
@@ -222,6 +217,7 @@ class UIScene extends Phaser.Scene {
   updateLives(lives) {
     this.livesText.setText(`LIVES: ${lives}`);
     
+    // Flash red when losing lives
     if (lives <= 1) {
       this.livesText.setColor("#ff4d6d");
     } else {
@@ -230,9 +226,7 @@ class UIScene extends Phaser.Scene {
   }
 
   showCombo(count) {
-    const { width, height } = this.scale;
-    const fs = (v) => ScaleManager.fontSize(v, width, height);
-
+    // Determine combo message
     let message, color;
     if (count >= 6) {
       message = `🔥 AMAZING x${count}! 🔥`;
@@ -246,11 +240,11 @@ class UIScene extends Phaser.Scene {
     }
 
     this.comboText.setText(message);
-    this.comboText.setFontSize(fs(40));
     this.comboText.setColor(color);
     this.comboText.setAlpha(1);
     this.comboText.setScale(0.5);
 
+    // Animate in
     this.tweens.killTweensOf(this.comboText);
     this.tweens.add({
       targets: this.comboText,
@@ -258,6 +252,7 @@ class UIScene extends Phaser.Scene {
       duration: 200,
       ease: "Back.easeOut",
       onComplete: () => {
+        // Hold then fade out
         this.tweens.add({
           targets: this.comboText,
           alpha: 0,
@@ -267,6 +262,7 @@ class UIScene extends Phaser.Scene {
           delay: 400,
           ease: "Cubic.easeIn",
           onComplete: () => {
+            // Reset position for next combo
             this.comboText.setY(this.scale.height * 0.35);
           }
         });
@@ -276,10 +272,9 @@ class UIScene extends Phaser.Scene {
 
   handleResize() {
     const { width, height } = this.scale;
-    const s = (v) => ScaleManager.scale(v, width, height);
     
-    this.livesText.setX(width - s(16));
-    this.pauseBtn.setPosition(width - s(24), s(60));
+    this.livesText.setX(width - 20);
+    this.pauseBtn.setPosition(width - 30, 80);
     this.comboText.setPosition(width / 2, height * 0.35);
     
     this.pauseContainer.setPosition(width / 2, height / 2);
@@ -296,3 +291,4 @@ class UIScene extends Phaser.Scene {
     this.scale.off("resize", this.handleResize, this);
   }
 }
+
