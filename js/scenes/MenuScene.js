@@ -20,29 +20,42 @@ class MenuScene extends Phaser.Scene {
       bg.setScale(scale).setAlpha(0.5);
     }
 
-    // Splash Logo
+    // Splash Logo - adjustable to fit screen
     if (this.textures.exists("logo")) {
       const logo = this.add.image(width / 2, height * 0.4, "logo");
-      const targetWidth = isPortrait ? width * 0.8 : width * 0.4;
-      logo.setScale(targetWidth / logo.width);
+      
+      // Calculate scale to fit within bounds
+      const maxWidth = isPortrait ? width * 0.85 : width * 0.45;
+      const maxHeight = height * 0.45; // Never exceed 45% of screen height
+      
+      const scaleByWidth = maxWidth / logo.width;
+      const scaleByHeight = maxHeight / logo.height;
+      
+      // Use the smaller scale to ensure it fits both constraints
+      const finalScale = Math.min(scaleByWidth, scaleByHeight);
+      logo.setScale(finalScale);
     } else {
       // Fallback Title
+      const fontSize = Math.min(64, width * 0.1);
       this.add.text(width / 2, height * 0.35, "FRUIT SLICE", {
         fontFamily: "Arial Black",
-        fontSize: "64px",
+        fontSize: `${fontSize}px`,
         color: "#ffffff"
       }).setOrigin(0.5);
     }
 
-    // Start Button
-    const btnW = isPortrait ? width * 0.6 : 300;
-    this.createStartButton(width / 2, height * 0.75, btnW, 70);
+    // Start Button - responsive sizing
+    const btnW = isPortrait ? width * 0.6 : Math.min(300, width * 0.25);
+    const btnH = Math.max(50, Math.min(70, height * 0.1));
+    const btnFontSize = Math.max(18, Math.min(28, height * 0.04));
+    this.createStartButton(width / 2, height * 0.75, btnW, btnH, btnFontSize);
 
-    // Best Score
+    // Best Score - responsive font
     const best = StorageManager.getBestScore("default");
-    this.add.text(width / 2, height * 0.85, `Best Score: ${best}`, {
+    const scoreFontSize = Math.max(16, Math.min(24, height * 0.035));
+    this.add.text(width / 2, height * 0.88, `Best Score: ${best}`, {
       fontFamily: "Arial",
-      fontSize: "24px",
+      fontSize: `${scoreFontSize}px`,
       color: "#888888"
     }).setOrigin(0.5);
 
@@ -56,17 +69,18 @@ class MenuScene extends Phaser.Scene {
     });
   }
 
-  createStartButton(x, y, w, h) {
+  createStartButton(x, y, w, h, fontSize = 28) {
     const container = this.add.container(x, y);
     
-    // Green button
+    // Green button with rounded corners
     const bg = this.add.graphics();
     bg.fillStyle(0x52b788, 1);
-    bg.fillRoundedRect(-w/2, -h/2, w, h, 15);
+    const radius = Math.min(15, h * 0.2);
+    bg.fillRoundedRect(-w/2, -h/2, w, h, radius);
     
     const txt = this.add.text(0, 0, "START GAME", {
       fontFamily: "Arial Black",
-      fontSize: "28px",
+      fontSize: `${fontSize}px`,
       color: "#ffffff"
     }).setOrigin(0.5);
     
@@ -84,7 +98,20 @@ class MenuScene extends Phaser.Scene {
   }
 
   startGame() {
-    // Always go fullscreen
+    // Prevent double-click issues
+    if (this.isStarting) return;
+    this.isStarting = true;
+
+    // Resume audio context
+    if (this.sound.context?.state === 'suspended') {
+      this.sound.context.resume();
+    }
+
+    // Start game immediately
+    this.scene.start("GameScene");
+    this.scene.launch("UIScene");
+
+    // Go fullscreen after starting (non-blocking)
     if (!this.scale.isFullscreen) {
       this.scale.startFullscreen();
     }
@@ -93,16 +120,5 @@ class MenuScene extends Phaser.Scene {
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock("landscape").catch(() => {});
     }
-
-    // Resume audio context
-    if (this.sound.context?.state === 'suspended') {
-      this.sound.context.resume();
-    }
-
-    this.cameras.main.fadeOut(300);
-    this.cameras.main.once("camerafadeoutcomplete", () => {
-      this.scene.start("GameScene");
-      this.scene.launch("UIScene");
-    });
   }
 }
