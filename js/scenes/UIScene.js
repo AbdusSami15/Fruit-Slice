@@ -47,6 +47,7 @@ class UIScene extends Phaser.Scene {
       gameScene.events.on("update-score", this.updateScore, this);
       gameScene.events.on("update-lives", this.updateLives, this);
       gameScene.events.on("show-combo", this.showCombo, this);
+      gameScene.events.on("plus-one", this.showPlusOne, this);
     }
 
     // Cleanup on shutdown
@@ -65,6 +66,12 @@ class UIScene extends Phaser.Scene {
         gameScene.events.off("update-score", this.updateScore, this);
         gameScene.events.off("update-lives", this.updateLives, this);
         gameScene.events.off("show-combo", this.showCombo, this);
+        gameScene.events.off("plus-one", this.showPlusOne, this);
+      }
+
+      // Remove any floating +1 elements
+      if (this.uiOverlay) {
+        this.uiOverlay.querySelectorAll(".plus-one").forEach((el) => el.remove());
       }
     });
   }
@@ -133,5 +140,25 @@ class UIScene extends Phaser.Scene {
         });
       }
     });
+  }
+
+  showPlusOne(payload) {
+    if (!this.uiOverlay) return;
+    const x = payload?.x ?? 0;
+    const y = payload?.y ?? 0;
+    const text = payload?.text ?? "+1";
+
+    const el = document.createElement("div");
+    el.className = "plus-one";
+    el.textContent = text;
+
+    // Position relative to viewport; Phaser uses the same pixel coords as the canvas size (RESIZE mode).
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+
+    this.uiOverlay.appendChild(el);
+
+    // Auto-remove after animation
+    window.setTimeout(() => el.remove(), 700);
   }
 }

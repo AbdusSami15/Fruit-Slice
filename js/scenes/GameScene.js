@@ -463,8 +463,8 @@ class GameScene extends Phaser.Scene {
     this.score += 1;
     this.emitGameState();
 
-    // Spawn a floating "+1" from the fruit position
-    this.spawnPointPopup(fruit.x, fruit.y, "+1");
+    // Spawn a floating "+1" via HTML UI (UIScene)
+    this.events.emit("plus-one", { x: fruit.x, y: fruit.y, text: "+1" });
 
     // Create juice splash effect
     this.createJuiceSplash(fruit.x, fruit.y, fruit.fruitColor || 0xff4d6d);
