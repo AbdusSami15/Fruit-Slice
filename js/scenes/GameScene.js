@@ -219,12 +219,18 @@ class GameScene extends Phaser.Scene {
       fruit.fruitColor = fruitData.color;
     }
 
+    // Scale fruit based on screen size
+    const fruitScale = ScaleManager.getFruitScale(width, height);
+    const baseVariation = Phaser.Math.FloatBetween(0.9, 1.1);
+    const finalScale = fruitScale * baseVariation;
+
     fruit.setDepth(10);
     fruit.setCircle(26);
     fruit.setBounce(0.2);
     fruit.setCollideWorldBounds(false);
     fruit.sliced = false;
     fruit.sliceCooldownUntil = 0;
+    fruit.baseRadius = 28 * finalScale; // Store for collision detection
 
     // Launch upward with velocity from difficulty curve
     const vx = Phaser.Math.Between(velocity.vxMin, velocity.vxMax);
@@ -234,8 +240,7 @@ class GameScene extends Phaser.Scene {
     fruit.body.setGravityY(gravity);
     fruit.body.setAngularVelocity(Phaser.Math.Between(-220, 220));
 
-    // Scale variation
-    fruit.setScale(Phaser.Math.FloatBetween(0.9, 1.1));
+    fruit.setScale(finalScale);
   }
 
   getWeightedRandomFruit() {
@@ -307,7 +312,7 @@ class GameScene extends Phaser.Scene {
       if (fruit.x < minX || fruit.x > maxX || fruit.y < minY || fruit.y > maxY) continue;
 
       // Precise segment-circle check
-      const r = 28 * fruit.scaleX;
+      const r = fruit.baseRadius || (28 * fruit.scaleX);
       if (this.segmentIntersectsCircle(x1, y1, x2, y2, fruit.x, fruit.y, r)) {
         this.sliceFruit(fruit, x1, y1, x2, y2);
       } else {
@@ -464,6 +469,10 @@ class GameScene extends Phaser.Scene {
   }
 
   showFloatingScore(x, y, score, combo, isBomb = false) {
+    const { width, height } = this.scale;
+    const fs = (v) => ScaleManager.fontSize(v, width, height);
+    const s = (v) => ScaleManager.scale(v, width, height);
+
     let text, color;
     
     if (isBomb) {
@@ -480,17 +489,17 @@ class GameScene extends Phaser.Scene {
       color = "#ffffff";
     }
 
-    const floatText = this.add.text(x, y - 20, text, {
+    const floatText = this.add.text(x, y - s(16), text, {
       fontFamily: "Arial Black",
-      fontSize: combo >= 3 ? "32px" : "24px",
+      fontSize: (combo >= 3 ? fs(24) : fs(18)) + "px",
       color: color,
       stroke: "#000000",
-      strokeThickness: 4
+      strokeThickness: s(3)
     }).setOrigin(0.5).setDepth(500);
 
     this.tweens.add({
       targets: floatText,
-      y: y - 80,
+      y: y - s(60),
       alpha: 0,
       scale: combo >= 3 ? 1.3 : 1.1,
       duration: 800,
@@ -503,21 +512,28 @@ class GameScene extends Phaser.Scene {
     // Don't spawn halves for bombs
     if (fruit.isBomb) return;
 
+    const { width, height } = this.scale;
+    const s = (v) => ScaleManager.scale(v, width, height);
+    const gravity = this.difficulty.getGravity(height);
+
     const type = fruit.type;
     const aKey = `half_${type}_a`;
     const bKey = `half_${type}_b`;
 
-    const left = this.physics.add.sprite(fruit.x - 12, fruit.y, aKey);
-    const right = this.physics.add.sprite(fruit.x + 12, fruit.y, bKey);
+    const offset = s(10);
+    const left = this.physics.add.sprite(fruit.x - offset, fruit.y, aKey);
+    const right = this.physics.add.sprite(fruit.x + offset, fruit.y, bKey);
 
     left.setScale(fruit.scaleX);
     right.setScale(fruit.scaleX);
 
-    left.body.setGravityY(1200);
-    right.body.setGravityY(1200);
+    left.body.setGravityY(gravity);
+    right.body.setGravityY(gravity);
 
-    left.body.setVelocity(fruit.body.velocity.x - 160, fruit.body.velocity.y - 80);
-    right.body.setVelocity(fruit.body.velocity.x + 160, fruit.body.velocity.y - 80);
+    const splitVx = s(140);
+    const splitVy = s(70);
+    left.body.setVelocity(fruit.body.velocity.x - splitVx, fruit.body.velocity.y - splitVy);
+    right.body.setVelocity(fruit.body.velocity.x + splitVx, fruit.body.velocity.y - splitVy);
 
     left.body.setAngularVelocity(Phaser.Math.Between(-260, -120));
     right.body.setAngularVelocity(Phaser.Math.Between(120, 260));
