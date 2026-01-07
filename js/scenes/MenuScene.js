@@ -254,8 +254,20 @@ class MenuScene extends Phaser.Scene {
     }
   }
 
-  handleResize() {
-    // Could update positions here if needed
+  handleResize(gameSize) {
+    const { width, height } = gameSize;
+    
+    // Restart scene to re-layout elements for new size
+    // Only if size changed significantly
+    if (this.lastWidth && (Math.abs(this.lastWidth - width) > 50 || Math.abs(this.lastHeight - height) > 50)) {
+      this.scene.restart();
+    }
+    this.lastWidth = width;
+    this.lastHeight = height;
+  }
+
+  shutdown() {
+    this.scale.off("resize", this.handleResize, this);
   }
 }
 

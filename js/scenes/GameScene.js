@@ -191,10 +191,10 @@ class GameScene extends Phaser.Scene {
   spawnFruit() {
     const { width, height } = this.scale;
 
-    // Get current difficulty parameters
+    // Get current difficulty parameters (scaled to screen size)
     const bombChance = this.difficulty.getBombChance();
-    const velocity = this.difficulty.getLaunchVelocity();
-    const gravity = this.difficulty.getGravity();
+    const velocity = this.difficulty.getLaunchVelocity(height, width);
+    const gravity = this.difficulty.getGravity(height);
 
     // Decide if spawning bomb or fruit
     const isBomb = Math.random() < bombChance;

@@ -8,10 +8,10 @@ const gameConfig = {
   parent: "game",
   backgroundColor: "#0b0f14",
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 1280,
-    height: 720,
+    mode: Phaser.Scale.RESIZE,
+    width: "100%",
+    height: "100%",
+    parent: "game",
     fullscreenTarget: "game"
   },
   physics: {

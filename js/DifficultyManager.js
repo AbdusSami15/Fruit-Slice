@@ -71,20 +71,34 @@ class DifficultyManager {
   }
 
   /**
-   * Get current launch velocity range
+   * Get current launch velocity range, scaled to screen height
+   * @param {number} screenHeight - Current screen height for scaling (base: 720)
+   * @param {number} screenWidth - Current screen width for horizontal scaling (base: 1280)
    */
-  getLaunchVelocity() {
+  getLaunchVelocity(screenHeight = 720, screenWidth = 1280) {
     const p = this.getProgress();
     const { launchVelocity } = this.preset;
     
+    // Scale velocities based on screen size (base dimensions: 1280x720)
+    const vyScale = screenHeight / 720;
+    const vxScale = screenWidth / 1280;
+    
     return {
-      // Horizontal spread
-      vxMin: Math.round(this.lerp(launchVelocity.vxRange[0], launchVelocity.vxRange[1], p)),
-      vxMax: Math.round(this.lerp(-launchVelocity.vxRange[0], -launchVelocity.vxRange[1], p)) * -1,
-      // Vertical (negative = upward)
-      vyMin: Math.round(this.lerp(launchVelocity.vyStartMin, launchVelocity.vyEndMin, p)),
-      vyMax: Math.round(this.lerp(launchVelocity.vyStartMax, launchVelocity.vyEndMax, p))
+      // Horizontal spread (scaled to screen width)
+      vxMin: Math.round(this.lerp(launchVelocity.vxRange[0], launchVelocity.vxRange[1], p) * vxScale),
+      vxMax: Math.round(this.lerp(-launchVelocity.vxRange[0], -launchVelocity.vxRange[1], p) * vxScale) * -1,
+      // Vertical (negative = upward, scaled to screen height)
+      vyMin: Math.round(this.lerp(launchVelocity.vyStartMin, launchVelocity.vyEndMin, p) * vyScale),
+      vyMax: Math.round(this.lerp(launchVelocity.vyStartMax, launchVelocity.vyEndMax, p) * vyScale)
     };
+  }
+
+  /**
+   * Get gravity scaled to screen height
+   */
+  getGravity(screenHeight = 720) {
+    const scale = screenHeight / 720;
+    return Math.round(this.preset.gravity * scale);
   }
 
   /**
@@ -112,13 +126,6 @@ class DifficultyManager {
    */
   getStartingLives() {
     return this.preset.lives;
-  }
-
-  /**
-   * Get gravity for fruits
-   */
-  getGravity() {
-    return this.preset.gravity;
   }
 
   /**
