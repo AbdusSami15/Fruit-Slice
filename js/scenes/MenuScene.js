@@ -35,28 +35,33 @@ class MenuScene extends Phaser.Scene {
       const finalScale = Math.min(scaleByWidth, scaleByHeight);
       logo.setScale(finalScale);
     } else {
-      // Fallback Title
+      // Fallback Title - colorful gradient look
       const fontSize = Math.min(64, width * 0.1);
-      this.add.text(width / 2, height * 0.35, "FRUIT SLICE", {
+      this.add.text(width / 2, height * 0.35, "🍉 FRUIT SLICE 🍎", {
         fontFamily: "Arial Black",
         fontSize: `${fontSize}px`,
-        color: "#ffffff"
+        color: "#ffc300",
+        stroke: "#ff6600",
+        strokeThickness: 6,
+        shadow: { offsetX: 4, offsetY: 4, color: "#000", blur: 10, fill: true }
       }).setOrigin(0.5);
     }
 
     // Start Button - responsive sizing
     const btnW = isPortrait ? width * 0.6 : Math.min(300, width * 0.25);
-    const btnH = Math.max(50, Math.min(70, height * 0.1));
-    const btnFontSize = Math.max(18, Math.min(28, height * 0.04));
-    this.createStartButton(width / 2, height * 0.75, btnW, btnH, btnFontSize);
+    const btnH = Math.max(55, Math.min(75, height * 0.12));
+    const btnFontSize = Math.max(20, Math.min(30, height * 0.045));
+    this.createStartButton(width / 2, height * 0.72, btnW, btnH, btnFontSize);
 
-    // Best Score - responsive font
+    // Best Score - colorful
     const best = StorageManager.getBestScore("default");
-    const scoreFontSize = Math.max(16, Math.min(24, height * 0.035));
-    this.add.text(width / 2, height * 0.88, `Best Score: ${best}`, {
-      fontFamily: "Arial",
+    const scoreFontSize = Math.max(18, Math.min(26, height * 0.04));
+    this.add.text(width / 2, height * 0.85, `🏆 Best Score: ${best}`, {
+      fontFamily: "Arial Black",
       fontSize: `${scoreFontSize}px`,
-      color: "#888888"
+      color: "#ffc300",
+      stroke: "#000000",
+      strokeThickness: 2
     }).setOrigin(0.5);
 
     // Proper resize handling
@@ -71,21 +76,33 @@ class MenuScene extends Phaser.Scene {
 
   createStartButton(x, y, w, h, fontSize = 28) {
     const container = this.add.container(x, y);
+    const radius = Math.min(18, h * 0.25);
     
-    // Green button with rounded corners
+    // Shadow
+    const shadow = this.add.graphics();
+    shadow.fillStyle(0x000000, 0.4);
+    shadow.fillRoundedRect(-w/2 + 4, -h/2 + 4, w, h, radius);
+    
+    // Main button - vibrant green gradient look
     const bg = this.add.graphics();
-    bg.fillStyle(0x52b788, 1);
-    const radius = Math.min(15, h * 0.2);
+    bg.fillStyle(0x10b981, 1);
     bg.fillRoundedRect(-w/2, -h/2, w, h, radius);
+    bg.fillStyle(0x059669, 1);
+    bg.fillRoundedRect(-w/2 + 4, -h/2 + h * 0.55, w - 8, h * 0.4, radius * 0.7);
     
-    const txt = this.add.text(0, 0, "START GAME", {
+    // Border glow
+    bg.lineStyle(3, 0x34d399, 1);
+    bg.strokeRoundedRect(-w/2, -h/2, w, h, radius);
+    
+    const txt = this.add.text(0, 0, "▶ START GAME", {
       fontFamily: "Arial Black",
       fontSize: `${fontSize}px`,
-      color: "#ffffff"
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 3
     }).setOrigin(0.5);
     
-    container.add([txt]);
-    container.addAt(bg, 0); // Put bg behind text
+    container.add([shadow, bg, txt]);
 
     const hitArea = new Phaser.Geom.Rectangle(-w/2, -h/2, w, h);
     container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
@@ -95,6 +112,7 @@ class MenuScene extends Phaser.Scene {
       container.setScale(1);
       this.startGame();
     });
+    container.on("pointerout", () => container.setScale(1));
   }
 
   startGame() {

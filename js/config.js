@@ -7,12 +7,20 @@ const gameConfig = {
   type: Phaser.AUTO,
   parent: "game",
   backgroundColor: "#0b0f14",
+  // HD rendering - account for device pixel ratio
+  resolution: window.devicePixelRatio || 1,
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: window.innerWidth,
     height: window.innerHeight,
     parent: "game"
+  },
+  // Crisp pixel rendering
+  render: {
+    antialias: true,
+    pixelArt: false,
+    roundPixels: false
   },
   physics: {
     default: "arcade",
