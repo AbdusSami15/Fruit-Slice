@@ -107,18 +107,25 @@ class MenuScene extends Phaser.Scene {
       this.sound.context.resume();
     }
 
-    // Start game immediately
-    this.scene.start("GameScene");
-    this.scene.launch("UIScene");
-
-    // Go fullscreen after starting (non-blocking)
-    if (!this.scale.isFullscreen) {
-      this.scale.startFullscreen();
+    // Go fullscreen first using document element for better support
+    const elem = document.documentElement;
+    if (!document.fullscreenElement) {
+      const requestFS = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.msRequestFullscreen;
+      if (requestFS) {
+        requestFS.call(elem).then(() => {
+          // Force resize after fullscreen activates
+          this.scale.resize(window.innerWidth, window.innerHeight);
+        }).catch(() => {});
+      }
     }
     
     // Lock to landscape on mobile
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock("landscape").catch(() => {});
     }
+
+    // Start game immediately
+    this.scene.start("GameScene");
+    this.scene.launch("UIScene");
   }
 }

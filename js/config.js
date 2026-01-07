@@ -9,10 +9,10 @@ const gameConfig = {
   backgroundColor: "#0b0f14",
   scale: {
     mode: Phaser.Scale.RESIZE,
-    width: "100%",
-    height: "100%",
-    parent: "game",
-    fullscreenTarget: "game"
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    parent: "game"
   },
   physics: {
     default: "arcade",
@@ -25,4 +25,35 @@ const gameConfig = {
 
 // Start the game
 const game = new Phaser.Game(gameConfig);
+
+// Force resize on any screen change
+function forceResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (game && game.scale) {
+    game.scale.resize(w, h);
+    game.scale.refresh();
+  }
+}
+
+// Handle fullscreen changes
+document.addEventListener("fullscreenchange", () => {
+  setTimeout(forceResize, 50);
+  setTimeout(forceResize, 200);
+});
+document.addEventListener("webkitfullscreenchange", () => {
+  setTimeout(forceResize, 50);
+  setTimeout(forceResize, 200);
+});
+
+// Handle window resize
+window.addEventListener("resize", () => {
+  setTimeout(forceResize, 50);
+});
+
+// Handle orientation change on mobile
+window.addEventListener("orientationchange", () => {
+  setTimeout(forceResize, 100);
+  setTimeout(forceResize, 300);
+});
 

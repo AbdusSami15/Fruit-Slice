@@ -47,13 +47,12 @@ class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // Background (using confirmed centered logic)
+    // Background - fill entire screen
+    this.cameras.main.setBackgroundColor("#0b0f14");
     if (this.textures.exists("background")) {
-      const bg = this.add.image(width / 2, height / 2, "background");
-      const scale = Math.max(width / bg.width, height / bg.height);
-      bg.setScale(scale).setAlpha(0.8);
-    } else {
-      this.cameras.main.setBackgroundColor("#0b0f14");
+      this.bg = this.add.image(width / 2, height / 2, "background");
+      const scale = Math.max(width / this.bg.width, height / this.bg.height);
+      this.bg.setScale(scale).setAlpha(0.8);
     }
 
     // Physics world
@@ -206,6 +205,13 @@ class GameScene extends Phaser.Scene {
   handleResize(gameSize) {
     const { width, height } = gameSize;
     this.physics.world.setBounds(0, 0, width, height);
+    
+    // Resize background to cover entire screen
+    if (this.bg) {
+      this.bg.setPosition(width / 2, height / 2);
+      const scale = Math.max(width / this.bg.width, height / this.bg.height);
+      this.bg.setScale(scale);
+    }
   }
 
   update(time, delta) {
