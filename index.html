@@ -28,13 +28,13 @@
       top: 0;
       left: 0;
     }
-    canvas { 
-      display: block; 
+    canvas {
+      display: block;
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw !important;
-      height: 100vh !important;
+      inset: 0;
+      /* Let Phaser manage the canvas size; avoid extra CSS scaling that can blur */
+      width: 100%;
+      height: 100%;
     }
 
     /* HTML UI Overlay - Crisp on all devices */

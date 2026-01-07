@@ -3,12 +3,18 @@
  * Entry point - creates the game instance with all scenes
  */
 
+function getDpr() {
+  // Keep rendering crisp on high-DPI screens; clamp to avoid extreme GPU memory use
+  const dpr = window.devicePixelRatio || 1;
+  return Math.max(1, Math.min(dpr, 2));
+}
+
 const gameConfig = {
   type: Phaser.WEBGL,  // Force WebGL for better performance and quality
   parent: "game",
   backgroundColor: "#0b0f14",
   // HD rendering - account for device pixel ratio
-  resolution: window.devicePixelRatio || 1,
+  resolution: getDpr(),
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -44,6 +50,11 @@ function forceResize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   if (game && game.scale) {
+    // Ensure renderer DPI matches current device DPR (can change on zoom/orientation/fullscreen)
+    const dpr = getDpr();
+    if (game.renderer && game.renderer.resolution !== dpr) {
+      game.renderer.resolution = dpr;
+    }
     game.scale.resize(w, h);
     game.scale.refresh();
   }

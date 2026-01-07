@@ -58,7 +58,8 @@ class BootScene extends Phaser.Scene {
 
     // Fruits (using exact names from screenshot)
     this.load.image("fruit_apple", "assets/images/fruits/apple.png");
-    this.load.image("fruit_watermelon", "assets/images/fruits/waterMelon.png"); // Capital M
+    // Keep key naming consistent with GameScene (`waterMelon`)
+    this.load.image("fruit_waterMelon", "assets/images/fruits/waterMelon.png"); // Capital M in filename
     this.load.image("fruit_pear", "assets/images/fruits/pear.png");
     this.load.image("fruit_peach", "assets/images/fruits/peach.png");
     this.load.image("bomb", "assets/images/fruits/bomb.png");
@@ -105,8 +106,15 @@ class BootScene extends Phaser.Scene {
   enableHDTextures() {
     // Apply HD filtering to all loaded image textures for crisp, smooth rendering
     const textureKeys = [
-      'background', 'fruit_apple', 'fruit_waterMelon', 'fruit_pear', 
-      'fruit_peach', 'bomb', 'logo', 'juiceDot', 'cross'
+      'background',
+      'fruit_apple',
+      'fruit_waterMelon',
+      'fruit_pear',
+      'fruit_peach',
+      'bomb',
+      'logo',
+      'juiceDot',
+      'cross'
     ];
     
     textureKeys.forEach(key => {
@@ -140,7 +148,8 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     };
 
-    const fruitColors = { apple: 0xff4d6d, watermelon: 0x52b788, pear: 0xffc300, peach: 0xffa07a, red: 0xff4d6d, green: 0x52b788, yellow: 0xffc300, purple: 0x9d4edd, orange: 0xff8c42, pink: 0xff69b4 };
+    // Keep names consistent with GameScene's fruitTypes (notably `waterMelon`)
+    const fruitColors = { apple: 0xff4d6d, waterMelon: 0x52b788, pear: 0xffc300, peach: 0xffa07a, red: 0xff4d6d, green: 0x52b788, yellow: 0xffc300, purple: 0x9d4edd, orange: 0xff8c42, pink: 0xff69b4 };
     Object.entries(fruitColors).forEach(([type, color]) => {
       makeCircle(`fruit_${type}`, color);
       makeHalf(`half_${type}_a`, color, false);
