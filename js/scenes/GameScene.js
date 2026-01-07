@@ -9,35 +9,33 @@ class GameScene extends Phaser.Scene {
   init() {
     // Gameplay state
     this.score = 0;
+    this.lives = 3;
     this.isGameOver = false;
     this.isPaused = false;
 
-    // Initialize difficulty manager
-    const difficultyMode = this.registry.get("difficulty") || "normal";
-    this.difficulty = new DifficultyManager(difficultyMode);
-    this.lives = this.difficulty.getStartingLives();
+    // Initialize difficulty manager (single mode, ramps over time)
+    this.difficulty = new DifficultyManager();
 
     // Spawning
     this.spawnTimer = null;
 
-    // Input trail
+    // Input trail - short trail that fades quickly
     this.trailPoints = [];
-    this.maxTrailPoints = 14;
-    this.minSliceSpeed = 900; // px/sec threshold for slice
+    this.maxTrailPoints = 8;         // Short trail
+    this.trailMaxAge = 80;           // Points expire after 80ms
+    this.minSliceSpeed = 100;        // Very low threshold - easy to slice
 
     // Slice detection optimization
-    this.maxFruitsToCheck = 12;      // Only check N most recent fruits
-    this.sliceCooldownMs = 100;      // Cooldown before same fruit can be sliced again
-    this.fruitRadiusMargin = 40;     // Bounding box expansion for segment check
+    this.maxFruitsToCheck = 20;      // Check more fruits
+    this.sliceCooldownMs = 30;       // Short cooldown
+    this.fruitRadiusMargin = 60;     // Larger bounding box
 
-    // Fruit types with scores and spawn weights
+    // Fruit types mapping to confirmed asset keys
     this.fruitTypes = [
-      { type: "red",    score: 10, weight: 25, color: 0xff4d6d },  // Apple
-      { type: "green",  score: 10, weight: 25, color: 0x52b788 },  // Lime
-      { type: "yellow", score: 15, weight: 20, color: 0xffc300 },  // Lemon
-      { type: "purple", score: 15, weight: 15, color: 0x9d4edd },  // Grape
-      { type: "orange", score: 20, weight: 10, color: 0xff8c42 },  // Orange
-      { type: "pink",   score: 25, weight: 5,  color: 0xff69b4 },  // Dragonfruit (rare)
+      { name: "apple",      score: 10, color: 0xff4d6d },
+      { name: "waterMelon", score: 15, color: 0x52b788 }, // Capital M from confirmed path
+      { name: "pear",       score: 10, color: 0xffc300 },
+      { name: "peach",      score: 12, color: 0xffa07a }  // Added Peach from folder
     ];
 
     // Combo system
@@ -49,47 +47,64 @@ class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // Background
-    this.cameras.main.setBackgroundColor("#0b0f14");
+    // Background (using confirmed centered logic)
+    if (this.textures.exists("background")) {
+      const bg = this.add.image(width / 2, height / 2, "background");
+      const scale = Math.max(width / bg.width, height / bg.height);
+      bg.setScale(scale).setAlpha(0.8);
+    } else {
+      this.cameras.main.setBackgroundColor("#0b0f14");
+    }
 
     // Physics world
     this.physics.world.setBounds(0, 0, width, height);
 
     // Groups
     this.fruits = this.physics.add.group();
-    this.juice = this.add.particles(0, 0, "juiceDot");
+    
+    // Audio status
+    this.audioStatus = this.registry.get("audioLoaded") || {};
+
+    // Particle system
+    try {
+      this.juice = this.add.particles("juiceDot");
+    } catch (e) {
+      console.warn("Failed to create particles", e);
+    }
 
     // Swipe trail graphics
     this.trailGfx = this.add.graphics();
     this.trailGfx.setDepth(1000);
 
-    // Audio setup
-    this.audioLoaded = this.registry.get("audioLoaded") || {};
-
     // Input handlers
     this.setupInput();
 
-    // Start spawning (difficulty scales automatically via DifficultyManager)
+    // Start spawning
     this.startSpawning();
 
-    // Resize support
-    this.scale.on("resize", this.handleResize, this);
+    // Proper resize handling
+    const resizeHandler = (gameSize) => {
+      if (this.scene.isActive()) this.handleResize(gameSize);
+    };
+    this.scale.on("resize", resizeHandler);
+    this.events.once("shutdown", () => {
+      this.scale.off("resize", resizeHandler);
+    });
 
     // Listen for events from UIScene
     this.events.on("pause-game", this.pauseGame, this);
     this.events.on("resume-game", this.resumeGame, this);
 
     // Fade in
-    this.cameras.main.fadeIn(300, 11, 15, 20);
+    this.cameras.main.fadeIn(300);
 
     // Emit initial state to UI
     this.emitGameState();
   }
 
-  // Play sound effect if enabled and loaded
   playSfx(key, config = {}) {
     if (!this.registry.get("soundEnabled")) return;
-    if (!this.audioLoaded[key]) return;
+    if (!this.audioStatus[key]) return;
     
     this.sound.play(`sfx_${key}`, {
       volume: config.volume || 0.5,
@@ -98,57 +113,112 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  playWhoosh() {
+    try {
+      // Resume audio context if needed
+      if (this.sound.context?.state === 'suspended') {
+        this.sound.context.resume();
+      }
+      
+      // Force play whoosh
+      this.sound.play("sfx_whoosh", { volume: 0.5 });
+    } catch (e) {
+      console.log("Whoosh sound error:", e);
+    }
+  }
+
   setupInput() {
+    this.pointerHeld = false;
+    this.pointerPos = { x: 0, y: 0 };
+    this.lastWhooshPos = null;
+
     this.input.on("pointerdown", (p) => {
       if (this.isGameOver || this.isPaused) return;
-      this.trailPoints.length = 0;
-      this.pushTrailPoint(p.x, p.y, p.time);
-      // Reset combo for new swipe
-      this.comboCount = 0;
-      if (this.comboTimeout) this.comboTimeout.remove(false);
+      this.pointerHeld = true;
+      this.pointerPos = { x: p.x, y: p.y };
+      this.lastWhooshPos = { x: p.x, y: p.y };
+      this.trySliceAtPoint(p.x, p.y);
     });
 
     this.input.on("pointermove", (p) => {
-      if (this.isGameOver || this.isPaused) return;
-      if (!p.isDown) return;
+      if (this.isGameOver || this.isPaused || !p.isDown) return;
 
+      this.pointerPos = { x: p.x, y: p.y };
       this.pushTrailPoint(p.x, p.y, p.time);
       this.renderTrail();
 
-      // Try slice on latest segment
-      if (this.trailPoints.length >= 2) {
-        const a = this.trailPoints[this.trailPoints.length - 2];
-        const b = this.trailPoints[this.trailPoints.length - 1];
+      // Play whoosh every 100px of movement
+      if (this.lastWhooshPos) {
+        const dx = p.x - this.lastWhooshPos.x;
+        const dy = p.y - this.lastWhooshPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist >= 200) {
+          this.playWhoosh();
+          this.lastWhooshPos = { x: p.x, y: p.y }; // Reset position for next whoosh
+        }
+      }
 
-        const dt = Math.max(1, (b.t - a.t));
-        const speed = (Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y) / dt) * 1000;
-
-        if (speed >= this.minSliceSpeed) {
+      // Check recent segments for collision
+      const len = this.trailPoints.length;
+      if (len >= 2) {
+        const segmentsToCheck = Math.min(3, len - 1);
+        for (let i = 0; i < segmentsToCheck; i++) {
+          const idx = len - 1 - i;
+          const a = this.trailPoints[idx - 1];
+          const b = this.trailPoints[idx];
           this.trySliceSegment(a.x, a.y, b.x, b.y);
         }
       }
     });
 
     this.input.on("pointerup", () => {
-      this.time.delayedCall(80, () => {
-        this.trailPoints.length = 0;
-        this.renderTrail();
-      });
+      this.pointerHeld = false;
+      this.trailPoints = [];
+      this.renderTrail();
     });
   }
 
-  handleResize() {
-    const { width, height } = this.scale;
+  // Slice any fruit at a single point (for tap/hold)
+  trySliceAtPoint(px, py) {
+    const now = this.time.now;
+    const fruits = this.fruits.getChildren();
+
+    for (let i = fruits.length - 1; i >= 0; i--) {
+      const fruit = fruits[i];
+      if (!fruit.active || fruit.sliced) continue;
+      if (fruit.sliceCooldownUntil && now < fruit.sliceCooldownUntil) continue;
+
+      // Distance from point to fruit center
+      const dx = px - fruit.x;
+      const dy = py - fruit.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      // Generous radius for tap detection
+      const hitRadius = (fruit.width / 2) * 1.4 * fruit.scaleX;
+      
+      if (dist <= hitRadius) {
+        this.sliceFruit(fruit, px - 10, py, px + 10, py);
+        return; // One fruit per tap check
+      }
+    }
+  }
+
+  handleResize(gameSize) {
+    const { width, height } = gameSize;
     this.physics.world.setBounds(0, 0, width, height);
   }
 
   update(time, delta) {
     if (this.isGameOver || this.isPaused) return;
 
-    // Update difficulty progression
     this.difficulty.update(delta);
 
     const { height } = this.scale;
+
+    // If finger is held down, check if any fruit moves into it
+    if (this.pointerHeld && this.pointerPos) {
+      this.trySliceAtPoint(this.pointerPos.x, this.pointerPos.y);
+    }
 
     // Check for missed fruits
     const children = this.fruits.getChildren();
@@ -162,44 +232,45 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  // ----------------------------
-  // Spawning
-  // ----------------------------
   startSpawning() {
-    if (this.spawnTimer) this.spawnTimer.remove(false);
+    // Fruit Ninja style: spawn fruits in WAVES
+    const spawnWave = () => {
+      if (this.isGameOver || this.isPaused || !this.scene.isActive()) return;
 
-    const spawnOnce = () => {
-      if (this.isGameOver || this.isPaused) return;
-
-      // Check max simultaneous fruits cap
-      const activeFruits = this.fruits.getChildren().filter(f => f.active && !f.sliced).length;
-      const maxFruits = this.difficulty.getMaxSimultaneousFruits();
-
-      if (activeFruits < maxFruits) {
-        this.spawnFruit();
+      // Get wave settings from difficulty
+      const wave = this.difficulty.getWaveSettings();
+      
+      // Random number of fruits in this wave (1 to wave.maxFruits)
+      const fruitsInWave = Phaser.Math.Between(wave.minFruits, wave.maxFruits);
+      
+      // Spawn each fruit in the wave with slight delay between them
+      for (let i = 0; i < fruitsInWave; i++) {
+        this.time.delayedCall(i * 80, () => {
+          if (!this.isGameOver && !this.isPaused) {
+            this.spawnFruit();
+          }
+        });
       }
 
-      // Get current spawn interval from difficulty curve
-      const interval = this.difficulty.getSpawnInterval();
-      const delay = Phaser.Math.Between(interval.min, interval.max);
-      this.spawnTimer = this.time.delayedCall(delay, spawnOnce);
+      // Wait before next wave
+      const waveDelay = Phaser.Math.Between(wave.delayMin, wave.delayMax);
+      this.spawnTimer = this.time.delayedCall(waveDelay, spawnWave);
     };
 
-    this.spawnTimer = this.time.delayedCall(400, spawnOnce);
+    // First wave after short delay
+    this.spawnTimer = this.time.delayedCall(600, spawnWave);
   }
 
   spawnFruit() {
     const { width, height } = this.scale;
-
-    // Get current difficulty parameters (scaled to screen size)
     const bombChance = this.difficulty.getBombChance();
-    const velocity = this.difficulty.getLaunchVelocity(height, width);
+    const hVel = this.difficulty.getHorizontalVelocity(width);
     const gravity = this.difficulty.getGravity(height);
 
-    // Decide if spawning bomb or fruit
     const isBomb = Math.random() < bombChance;
-
-    const x = Phaser.Math.Between(60, width - 60);
+    // Spawn in center 60% of screen (20% margin on each side)
+    const marginX = width * 0.2;
+    const x = Phaser.Math.Between(marginX, width - marginX);
     const y = height + 70;
 
     let fruit;
@@ -208,52 +279,54 @@ class GameScene extends Phaser.Scene {
       fruit.type = "bomb";
       fruit.isBomb = true;
       fruit.fruitScore = 0;
-      fruit.fruitColor = 0xff0000;
     } else {
-      // Weighted random fruit selection
-      const fruitData = this.getWeightedRandomFruit();
-      fruit = this.fruits.create(x, y, `fruit_${fruitData.type}`);
-      fruit.type = fruitData.type;
+      const fruitData = Phaser.Utils.Array.GetRandom(this.fruitTypes);
+      fruit = this.fruits.create(x, y, `fruit_${fruitData.name}`);
+      fruit.type = fruitData.name;
       fruit.isBomb = false;
       fruit.fruitScore = fruitData.score;
       fruit.fruitColor = fruitData.color;
     }
 
     fruit.setDepth(10);
-    fruit.setCircle(26);
-    fruit.setBounce(0.2);
-    fruit.setCollideWorldBounds(false);
+    fruit.setCircle(30);
     fruit.sliced = false;
     fruit.sliceCooldownUntil = 0;
 
-    // Launch upward with velocity from difficulty curve
-    const vx = Phaser.Math.Between(velocity.vxMin, velocity.vxMax);
-    const vy = Phaser.Math.Between(velocity.vyMin, velocity.vyMax);
+    // Horizontal velocity (random direction left or right)
+    const vxMag = Phaser.Math.Between(hVel.min, hVel.max);
+    const vx = Math.random() < 0.5 ? -vxMag : vxMag;
+    
+    // Vertical velocity: calculated to peak at center of screen
+    // Using physics: v² = u² + 2as → u = sqrt(2 * g * distance)
+    const distanceToPeak = y - (height / 2);
+    const variation = Phaser.Math.FloatBetween(0.8, 1.0); // 80-100% of way to center
+    const vy = -Math.sqrt(2 * gravity * distanceToPeak * variation);
 
     fruit.body.setVelocity(vx, vy);
     fruit.body.setGravityY(gravity);
     fruit.body.setAngularVelocity(Phaser.Math.Between(-220, 220));
 
-    // Scale variation
-    fruit.setScale(Phaser.Math.FloatBetween(0.9, 1.1));
-  }
-
-  getWeightedRandomFruit() {
-    const totalWeight = this.fruitTypes.reduce((sum, f) => sum + f.weight, 0);
-    let random = Math.random() * totalWeight;
+    // Calculate scale so fruit is roughly 14% of screen height
+    const targetHeight = height * 0.14;
+    const finalScale = targetHeight / fruit.height;
+    fruit.setScale(finalScale);
     
-    for (const fruitData of this.fruitTypes) {
-      random -= fruitData.weight;
-      if (random <= 0) return fruitData;
-    }
-    return this.fruitTypes[0]; // Fallback
+    // Hit area larger than visual for forgiving slices
+    const radius = (fruit.width / 2) * 1.2;
+    fruit.setCircle(radius, (fruit.width / 2) - radius, (fruit.height / 2) - radius);
   }
 
-  // ----------------------------
-  // Trail + slicing
-  // ----------------------------
   pushTrailPoint(x, y, t) {
-    this.trailPoints.push({ x, y, t });
+    // Remove old points based on time
+    const now = t || Date.now();
+    while (this.trailPoints.length > 0 && now - this.trailPoints[0].t > this.trailMaxAge) {
+      this.trailPoints.shift();
+    }
+    
+    this.trailPoints.push({ x, y, t: now });
+    
+    // Also cap by count
     if (this.trailPoints.length > this.maxTrailPoints) {
       this.trailPoints.shift();
     }
@@ -261,57 +334,62 @@ class GameScene extends Phaser.Scene {
 
   renderTrail() {
     this.trailGfx.clear();
+    const points = this.trailPoints;
+    if (points.length < 2) return;
 
-    if (this.trailPoints.length < 2) return;
-
-    for (let i = 1; i < this.trailPoints.length; i++) {
-      const p0 = this.trailPoints[i - 1];
-      const p1 = this.trailPoints[i];
-
-      const alpha = i / this.trailPoints.length;
-      const thickness = 2 + alpha * 8;
-
-      this.trailGfx.lineStyle(thickness, 0xffffff, 0.12 + alpha * 0.65);
+    // Blade trail: tapered line
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      
+      const progress = i / (points.length - 1);
+      
+      // Thicker taper: 2px to 8px
+      const width = 2 + progress * 6;
+      
+      // Fade
+      const alpha = progress * 0.85;
+      
+      this.trailGfx.lineStyle(width, 0xffffff, alpha);
       this.trailGfx.beginPath();
-      this.trailGfx.moveTo(p0.x, p0.y);
-      this.trailGfx.lineTo(p1.x, p1.y);
+      this.trailGfx.moveTo(prev.x, prev.y);
+      this.trailGfx.lineTo(curr.x, curr.y);
       this.trailGfx.strokePath();
+    }
+
+    // Bright tip
+    if (points.length > 0) {
+      const tip = points[points.length - 1];
+      this.trailGfx.fillStyle(0xffffff, 0.95);
+      this.trailGfx.fillCircle(tip.x, tip.y, 5);
     }
   }
 
   trySliceSegment(x1, y1, x2, y2) {
     const now = this.time.now;
     const fruits = this.fruits.getChildren();
-    const count = fruits.length;
-
-    // Calculate segment bounding box with margin
-    const margin = this.fruitRadiusMargin;
+    
+    // Generous bounding box for quick rejection
+    const margin = 100;
     const minX = Math.min(x1, x2) - margin;
     const maxX = Math.max(x1, x2) + margin;
     const minY = Math.min(y1, y2) - margin;
     const maxY = Math.max(y1, y2) + margin;
 
-    // Only check last N fruits (most recently spawned)
-    const startIdx = Math.max(0, count - this.maxFruitsToCheck);
-
-    for (let i = startIdx; i < count; i++) {
+    for (let i = fruits.length - 1; i >= 0; i--) {
       const fruit = fruits[i];
-
-      // Skip inactive or already sliced
       if (!fruit.active || fruit.sliced) continue;
-
-      // Skip if in cooldown (prevents double-slice from rapid input)
       if (fruit.sliceCooldownUntil && now < fruit.sliceCooldownUntil) continue;
 
-      // Fast bounding box rejection
+      // Fast rejection
       if (fruit.x < minX || fruit.x > maxX || fruit.y < minY || fruit.y > maxY) continue;
 
-      // Precise segment-circle check
-      const r = 28 * fruit.scaleX;
-      if (this.segmentIntersectsCircle(x1, y1, x2, y2, fruit.x, fruit.y, r)) {
+      // Generous collision radius (1.3x visual size for forgiving hits)
+      const collisionRadius = (fruit.width / 2) * 1.3 * fruit.scaleX;
+      
+      if (this.segmentIntersectsCircle(x1, y1, x2, y2, fruit.x, fruit.y, collisionRadius)) {
         this.sliceFruit(fruit, x1, y1, x2, y2);
       } else {
-        // Set cooldown to avoid re-checking this fruit too soon
         fruit.sliceCooldownUntil = now + this.sliceCooldownMs;
       }
     }
@@ -320,7 +398,6 @@ class GameScene extends Phaser.Scene {
   segmentIntersectsCircle(x1, y1, x2, y2, cx, cy, r) {
     const dx = x2 - x1;
     const dy = y2 - y1;
-
     const len2 = dx * dx + dy * dy;
     if (len2 <= 0.0001) return false;
 
@@ -337,294 +414,214 @@ class GameScene extends Phaser.Scene {
   sliceFruit(fruit, x1, y1, x2, y2) {
     fruit.sliced = true;
 
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const angle = Math.atan2(dy, dx);
-
-    // Handle bomb slice - lose a life!
     if (fruit.isBomb) {
-      this.sliceBomb(fruit, angle);
+      this.playSfx("gameover");
+      this.cameras.main.shake(200, 0.02);
+      this.missFruit(fruit);
       return;
     }
 
-    // Play slice sound with slight pitch variation
-    this.playSfx("slice", { 
-      volume: 0.6, 
-      detune: Phaser.Math.Between(-100, 100) 
-    });
-
-    // Increment combo
+    this.playSfx("slice", { volume: 0.6, detune: Phaser.Math.Between(-100, 100) });
     this.comboCount++;
     this.scheduleComboFinalize();
 
-    // Calculate score with combo multiplier
-    const baseScore = fruit.fruitScore;
     const comboMultiplier = this.comboCount > 1 ? this.comboCount : 1;
-    const earnedScore = baseScore * comboMultiplier;
-    
-    this.score += earnedScore;
+    this.score += fruit.fruitScore * comboMultiplier;
     this.emitGameState();
 
-    // Show floating score at fruit position
-    this.showFloatingScore(fruit.x, fruit.y, earnedScore, this.comboCount);
+    // Create juice splash effect
+    this.createJuiceSplash(fruit.x, fruit.y, fruit.fruitColor || 0xff4d6d);
 
-    // Juice particles
-    this.juice.createEmitter({
-      x: fruit.x,
-      y: fruit.y,
-      lifespan: 500,
-      speed: { min: 120, max: 420 },
-      angle: { min: Phaser.Math.RadToDeg(angle) - 60, max: Phaser.Math.RadToDeg(angle) + 60 },
-      scale: { start: 0.45, end: 0 },
-      quantity: 10,
-      frequency: -1,
-      tint: fruit.fruitColor,
-      blendMode: "ADD"
-    }).explode(18, fruit.x, fruit.y);
+    // Create two halves that fly apart
+    this.createSlicedHalves(fruit, x1, y1, x2, y2);
 
-    // Spawn halves
-    this.spawnHalves(fruit);
-
-    // Pop animation
+    // Hide original fruit immediately
+    fruit.setVisible(false);
     this.tweens.add({
       targets: fruit,
-      scale: fruit.scaleX * 1.15,
+      alpha: 0,
+      duration: 100,
+      onComplete: () => fruit.destroy()
+    });
+  }
+
+  createSlicedHalves(fruit, x1, y1, x2, y2) {
+    const textureKey = fruit.texture.key;
+    const frame = fruit.frame.name;
+    const x = fruit.x;
+    const y = fruit.y;
+    const scale = fruit.scaleX;
+    const rotation = fruit.rotation;
+    
+    // Get original texture dimensions
+    const texW = fruit.width;
+    const texH = fruit.height;
+    
+    // Calculate slice angle from swipe direction
+    const sliceAngle = Math.atan2(y2 - y1, x2 - x1);
+    const perpAngle = sliceAngle + Math.PI / 2;
+    
+    // Create left half
+    const leftHalf = this.add.image(x, y, textureKey, frame);
+    leftHalf.setScale(scale);
+    leftHalf.setRotation(rotation);
+    leftHalf.setDepth(15);
+    leftHalf.setCrop(0, 0, texW / 2, texH);
+    leftHalf.setOrigin(1, 0.5);
+    
+    // Create right half
+    const rightHalf = this.add.image(x, y, textureKey, frame);
+    rightHalf.setScale(scale);
+    rightHalf.setRotation(rotation);
+    rightHalf.setDepth(15);
+    rightHalf.setCrop(texW / 2, 0, texW / 2, texH);
+    rightHalf.setOrigin(0, 0.5);
+    
+    // Phase 1: Quick "pop" apart with slight upward motion (the jerk feeling)
+    const popDistance = 20;
+    const popUp = 30;
+    
+    // Left half - pop apart
+    this.tweens.add({
+      targets: leftHalf,
+      x: x + Math.cos(perpAngle + Math.PI) * popDistance,
+      y: y - popUp,
+      rotation: rotation - 0.3,
       duration: 80,
-      yoyo: true,
+      ease: 'Quad.easeOut',
       onComplete: () => {
-        fruit.destroy();
+        // Phase 2: Fall with gravity and spin
+        this.tweens.add({
+          targets: leftHalf,
+          x: leftHalf.x + Math.cos(perpAngle + Math.PI) * 80 + Phaser.Math.Between(-30, 30),
+          y: leftHalf.y + 350,
+          rotation: rotation - 3,
+          alpha: 0,
+          scale: scale * 0.5,
+          duration: 800,
+          ease: 'Quad.easeIn',
+          onComplete: () => leftHalf.destroy()
+        });
+      }
+    });
+    
+    // Right half - pop apart
+    this.tweens.add({
+      targets: rightHalf,
+      x: x + Math.cos(perpAngle) * popDistance,
+      y: y - popUp,
+      rotation: rotation + 0.3,
+      duration: 80,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        // Phase 2: Fall with gravity and spin
+        this.tweens.add({
+          targets: rightHalf,
+          x: rightHalf.x + Math.cos(perpAngle) * 80 + Phaser.Math.Between(-30, 30),
+          y: rightHalf.y + 350,
+          rotation: rotation + 3,
+          alpha: 0,
+          scale: scale * 0.5,
+          duration: 800,
+          ease: 'Quad.easeIn',
+          onComplete: () => rightHalf.destroy()
+        });
       }
     });
   }
 
-  sliceBomb(bomb, angle) {
-    // Play bomb explosion sound
-    this.playSfx("bomb", { volume: 0.8 });
-
-    // Explosion particles (red/orange)
-    this.juice.createEmitter({
-      x: bomb.x,
-      y: bomb.y,
-      lifespan: 600,
-      speed: { min: 200, max: 500 },
-      angle: { min: 0, max: 360 },
-      scale: { start: 0.6, end: 0 },
-      quantity: 25,
-      frequency: -1,
-      tint: [0xff0000, 0xff6600, 0xffaa00],
-      blendMode: "ADD"
-    }).explode(30, bomb.x, bomb.y);
-
-    // Screen shake
-    this.cameras.main.shake(200, 0.015);
-
-    // Flash red
-    this.cameras.main.flash(150, 255, 0, 0, false);
-
-    // Lose a life
-    this.lives -= 1;
-    this.emitGameState();
-
-    // Show penalty text
-    this.showFloatingScore(bomb.x, bomb.y, -1, 0, true);
-
-    // Destroy bomb
-    this.tweens.add({
-      targets: bomb,
-      scale: bomb.scaleX * 1.5,
-      alpha: 0,
-      duration: 150,
-      onComplete: () => {
-        bomb.destroy();
+  createJuiceSplash(x, y, color) {
+    // Create static smudge/stain on background
+    const smudge = this.add.graphics();
+    smudge.setDepth(1);
+    smudge.setPosition(x, y);
+    
+    // Main splat - multiple overlapping circles for organic shape
+    smudge.fillStyle(color, 0.7);
+    const mainSize = Phaser.Math.Between(35, 55);
+    smudge.fillCircle(0, 0, mainSize);
+    smudge.fillCircle(Phaser.Math.Between(-15, 15), Phaser.Math.Between(-15, 15), mainSize * 0.7);
+    smudge.fillCircle(Phaser.Math.Between(-20, 20), Phaser.Math.Between(-20, 20), mainSize * 0.5);
+    
+    // Darker center
+    const colorObj = Phaser.Display.Color.IntegerToColor(color);
+    const darkerColor = Phaser.Display.Color.GetColor(
+      Math.max(0, colorObj.red - 50),
+      Math.max(0, colorObj.green - 50),
+      Math.max(0, colorObj.blue - 50)
+    );
+    smudge.fillStyle(darkerColor, 0.5);
+    smudge.fillCircle(0, 0, mainSize * 0.4);
+    
+    // Scattered droplets
+    smudge.fillStyle(color, 0.6);
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Phaser.Math.Between(40, 80);
+      const size = Phaser.Math.Between(3, 8);
+      smudge.fillCircle(Math.cos(angle) * dist, Math.sin(angle) * dist, size);
+    }
+    
+    smudge.setAlpha(0.85);
+    
+    // Fade after delay
+    this.time.delayedCall(2500, () => {
+      if (smudge.active) {
+        this.tweens.add({
+          targets: smudge,
+          alpha: 0,
+          duration: 1500,
+          onComplete: () => { if (smudge.active) smudge.destroy(); }
+        });
       }
     });
+  }
 
-    // Check game over
-    if (this.lives <= 0) {
-      this.time.delayedCall(300, () => this.gameOver());
-    }
+  missFruit(fruit) {
+    if (!fruit.isBomb) this.playSfx("miss", { volume: 0.5 });
+    fruit.destroy();
+    this.lives--;
+    this.emitGameState();
+    if (this.lives <= 0) this.gameOver();
   }
 
   scheduleComboFinalize() {
-    // Reset combo timer
     if (this.comboTimeout) this.comboTimeout.remove(false);
-    
     this.comboTimeout = this.time.delayedCall(this.comboWindowMs, () => {
-      // Emit combo result to UI if it was a combo
       if (this.comboCount >= 3) {
         this.events.emit("show-combo", this.comboCount);
-        // Play combo sound with higher pitch for bigger combos
-        this.playSfx("combo", { 
-          volume: 0.7, 
-          detune: Math.min(this.comboCount * 50, 300) 
-        });
+        this.playSfx("combo", { volume: 0.7, detune: Math.min(this.comboCount * 50, 300) });
       }
       this.comboCount = 0;
     });
   }
 
-  showFloatingScore(x, y, score, combo, isBomb = false) {
-    let text, color;
-    
-    if (isBomb) {
-      text = "BOMB! -1 ❤️";
-      color = "#ff0000";
-    } else if (combo >= 3) {
-      text = `+${score} x${combo} COMBO!`;
-      color = "#ffc300";
-    } else if (combo === 2) {
-      text = `+${score} x2`;
-      color = "#4cc9f0";
-    } else {
-      text = `+${score}`;
-      color = "#ffffff";
-    }
-
-    const floatText = this.add.text(x, y - 20, text, {
-      fontFamily: "Arial Black",
-      fontSize: combo >= 3 ? "32px" : "24px",
-      color: color,
-      stroke: "#000000",
-      strokeThickness: 4
-    }).setOrigin(0.5).setDepth(500);
-
-    this.tweens.add({
-      targets: floatText,
-      y: y - 80,
-      alpha: 0,
-      scale: combo >= 3 ? 1.3 : 1.1,
-      duration: 800,
-      ease: "Cubic.easeOut",
-      onComplete: () => floatText.destroy()
-    });
-  }
-
-  spawnHalves(fruit) {
-    // Don't spawn halves for bombs
-    if (fruit.isBomb) return;
-
-    const type = fruit.type;
-    const aKey = `half_${type}_a`;
-    const bKey = `half_${type}_b`;
-
-    const left = this.physics.add.sprite(fruit.x - 12, fruit.y, aKey);
-    const right = this.physics.add.sprite(fruit.x + 12, fruit.y, bKey);
-
-    left.setScale(fruit.scaleX);
-    right.setScale(fruit.scaleX);
-
-    left.body.setGravityY(1200);
-    right.body.setGravityY(1200);
-
-    left.body.setVelocity(fruit.body.velocity.x - 160, fruit.body.velocity.y - 80);
-    right.body.setVelocity(fruit.body.velocity.x + 160, fruit.body.velocity.y - 80);
-
-    left.body.setAngularVelocity(Phaser.Math.Between(-260, -120));
-    right.body.setAngularVelocity(Phaser.Math.Between(120, 260));
-
-    left.setDepth(9);
-    right.setDepth(9);
-
-    // Auto cleanup
-    this.time.delayedCall(2200, () => {
-      if (left.active) left.destroy();
-      if (right.active) right.destroy();
-    });
-  }
-
-  // ----------------------------
-  // Miss / Pause / Game Over
-  // ----------------------------
-  missFruit(fruit) {
-    // Bombs that fall off screen are fine - no penalty!
-    if (fruit.isBomb) {
-      fruit.destroy();
-      return;
-    }
-
-    // Play miss sound
-    this.playSfx("miss", { volume: 0.5 });
-
-    fruit.destroy();
-    this.lives -= 1;
-    this.emitGameState();
-
-    if (this.lives <= 0) {
-      this.gameOver();
-    }
-  }
-
-  pauseGame() {
-    this.isPaused = true;
-    
-    // Pause physics
-    this.physics.pause();
-    
-    // Pause spawn timer
-    if (this.spawnTimer) this.spawnTimer.paused = true;
-    
-    // Pause all active tweens in this scene
-    this.tweens.pauseAll();
-    
-    // Pause time events (delayed calls)
-    this.time.paused = true;
-  }
-
-  resumeGame() {
-    this.isPaused = false;
-    
-    // Resume physics
-    this.physics.resume();
-    
-    // Resume spawn timer
-    if (this.spawnTimer) this.spawnTimer.paused = false;
-    
-    // Resume all tweens
-    this.tweens.resumeAll();
-    
-    // Resume time events
-    this.time.paused = false;
-  }
-
   emitGameState() {
-    // Send state to UIScene
     this.events.emit("update-score", this.score);
     this.events.emit("update-lives", this.lives);
   }
 
   gameOver() {
+    if (this.isGameOver) return;
     this.isGameOver = true;
-
-    // Play game over sound
     this.playSfx("gameover", { volume: 0.7 });
-
     if (this.spawnTimer) this.spawnTimer.remove(false);
-
-    // Clear trail
-    this.trailPoints.length = 0;
-    this.renderTrail();
-
-    // Check if new best score for this difficulty
-    const difficulty = this.difficulty.mode;
-    const isNewBest = StorageManager.updateBestScore(difficulty, this.score);
     
-    // Update registry with new best scores
-    this.registry.set("bestScores", StorageManager.getAllBestScores());
-
-    // Stop UI scene and start game over
+    const isNewBest = StorageManager.updateBestScore("default", this.score);
+    
     this.scene.stop("UIScene");
     this.scene.launch("GameOverScene", { 
       score: this.score, 
-      difficulty: difficulty,
       isNewBest: isNewBest
     });
   }
 
+  pauseGame() { this.isPaused = true; this.physics.pause(); if (this.spawnTimer) this.spawnTimer.paused = true; }
+  resumeGame() { this.isPaused = false; this.physics.resume(); if (this.spawnTimer) this.spawnTimer.paused = false; }
+
   shutdown() {
-    // Cleanup
     this.scale.off("resize", this.handleResize, this);
     this.events.off("pause-game", this.pauseGame, this);
     this.events.off("resume-game", this.resumeGame, this);
   }
 }
-
