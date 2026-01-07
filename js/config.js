@@ -4,7 +4,7 @@
  */
 
 const gameConfig = {
-  type: Phaser.AUTO,
+  type: Phaser.WEBGL,  // Force WebGL for better performance and quality
   parent: "game",
   backgroundColor: "#0b0f14",
   // HD rendering - account for device pixel ratio
@@ -16,11 +16,16 @@ const gameConfig = {
     height: window.innerHeight,
     parent: "game"
   },
-  // Crisp pixel rendering
+  // HD rendering settings for crisp, smooth images
   render: {
     antialias: true,
+    antialiasGL: true,
+    mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
     pixelArt: false,
-    roundPixels: false
+    roundPixels: false,
+    powerPreference: 'high-performance',
+    batchSize: 4096,
+    maxTextures: 16
   },
   physics: {
     default: "arcade",

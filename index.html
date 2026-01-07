@@ -185,10 +185,110 @@
       background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     }
 
+    /* Game Over Overlay */
+    #gameover-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+    }
+    #gameover-overlay.active {
+      display: flex;
+    }
+    #gameover-panel {
+      background: linear-gradient(135deg, #0f0a1e 0%, #1e1b4b 100%);
+      padding: clamp(30px, 6vw, 50px);
+      border-radius: 24px;
+      border: 4px solid transparent;
+      background-clip: padding-box;
+      position: relative;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      text-align: center;
+      min-width: min(90vw, 420px);
+      max-width: 500px;
+    }
+    #gameover-panel::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 24px;
+      padding: 4px;
+      background: linear-gradient(135deg, #f72585, #7209b7, #4361ee, #4cc9f0);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      z-index: -1;
+    }
+    #gameover-title {
+      font-size: clamp(32px, 6vw, 48px);
+      font-weight: 900;
+      color: #ff4d6d;
+      text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
+      margin-bottom: 20px;
+    }
+    #gameover-score-label {
+      font-size: clamp(14px, 2.5vw, 18px);
+      color: #888888;
+      margin-bottom: 8px;
+    }
+    #gameover-score-value {
+      font-size: clamp(48px, 10vw, 72px);
+      font-weight: 900;
+      color: #4cc9f0;
+      text-shadow: 3px 3px 8px rgba(28, 58, 95, 0.8), 0 0 20px rgba(76, 201, 240, 0.4);
+      margin-bottom: 20px;
+    }
+    #gameover-best {
+      font-size: clamp(18px, 3.5vw, 24px);
+      font-weight: 900;
+      color: #888888;
+      text-shadow: 1px 1px 2px #000;
+      margin-bottom: 30px;
+    }
+    #gameover-best.new-best {
+      color: #ffc300;
+      animation: bestPulse 1s ease infinite;
+    }
+    .gameover-btn {
+      display: block;
+      width: 100%;
+      padding: clamp(14px, 3vw, 20px);
+      margin: 12px 0;
+      font-size: clamp(18px, 3.5vw, 24px);
+      font-weight: 900;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: transform 0.1s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      text-shadow: 1px 1px 2px #000;
+    }
+    .gameover-btn:active {
+      transform: scale(0.95);
+    }
+    #playagain-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    #home-btn {
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    }
+
     /* Animations */
     @keyframes scorePop {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.15); }
+    }
+    @keyframes bestPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
     }
   </style>
 </head>
@@ -216,6 +316,18 @@
       <h2>⏸ PAUSED</h2>
       <button class="pause-btn" id="resume-btn">▶ RESUME</button>
       <button class="pause-btn" id="menu-btn">🏠 MAIN MENU</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div id="gameover-overlay">
+    <div id="gameover-panel">
+      <div id="gameover-title">💀 GAME OVER</div>
+      <div id="gameover-score-label">YOUR SCORE</div>
+      <div id="gameover-score-value">0</div>
+      <div id="gameover-best">🏆 Best: 0</div>
+      <button class="gameover-btn" id="playagain-btn">▶ PLAY AGAIN</button>
+      <button class="gameover-btn" id="home-btn">🏠 MAIN MENU</button>
     </div>
   </div>
 

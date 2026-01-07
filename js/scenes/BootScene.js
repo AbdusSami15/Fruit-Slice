@@ -79,6 +79,9 @@ class BootScene extends Phaser.Scene {
     try {
       this.createFallbackTextures();
       
+      // Enable HD smooth filtering for all loaded textures
+      this.enableHDTextures();
+      
       const savedData = StorageManager.load();
       
       // Force sound enabled
@@ -97,6 +100,21 @@ class BootScene extends Phaser.Scene {
       // Try to start the game anyway
       this.scene.start("MenuScene");
     }
+  }
+
+  enableHDTextures() {
+    // Apply HD filtering to all loaded image textures for crisp, smooth rendering
+    const textureKeys = [
+      'background', 'fruit_apple', 'fruit_waterMelon', 'fruit_pear', 
+      'fruit_peach', 'bomb', 'logo', 'juiceDot', 'cross'
+    ];
+    
+    textureKeys.forEach(key => {
+      if (this.textures.exists(key)) {
+        const texture = this.textures.get(key);
+        texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
+    });
   }
 
   createFallbackTextures() {

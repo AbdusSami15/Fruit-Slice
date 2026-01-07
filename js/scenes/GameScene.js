@@ -298,6 +298,11 @@ class GameScene extends Phaser.Scene {
     fruit.setCircle(30);
     fruit.sliced = false;
     fruit.sliceCooldownUntil = 0;
+    
+    // Enable smooth HD rendering for this sprite
+    if (fruit.texture) {
+      fruit.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    }
 
     // Horizontal velocity (random direction left or right)
     const vxMag = Phaser.Math.Between(hVel.min, hVel.max);
