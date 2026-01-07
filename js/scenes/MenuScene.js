@@ -6,9 +6,20 @@ class MenuScene extends Phaser.Scene {
     super("MenuScene");
   }
 
+  init() {
+    // Reset start latch whenever we enter the menu (scene instances are reused)
+    this.isStarting = false;
+  }
+
   create() {
     const { width, height } = this.scale;
     const isPortrait = height > width;
+
+    // Try to start background music on first user interaction (autoplay-safe)
+    this.input.once("pointerdown", () => {
+      const bgm = this.sound.get("bgm");
+      if (bgm && !bgm.isPlaying) bgm.play();
+    });
 
     // Background
     this.cameras.main.setBackgroundColor("#0b0f14");
@@ -124,6 +135,10 @@ class MenuScene extends Phaser.Scene {
     if (this.sound.context?.state === 'suspended') {
       this.sound.context.resume();
     }
+
+    // Ensure background music is playing after audio is unlocked
+    const bgm = this.sound.get("bgm");
+    if (bgm && !bgm.isPlaying) bgm.play();
 
     // Go fullscreen first using document element for better support
     const elem = document.documentElement;

@@ -42,6 +42,9 @@ class GameScene extends Phaser.Scene {
     this.comboCount = 0;           // Fruits sliced in current swipe
     this.comboTimeout = null;      // Timer to finalize combo
     this.comboWindowMs = 150;      // Time window to chain slices
+
+    // Reset bomb gameover latch each round (scene instance is reused)
+    this._bombGameOverTriggered = false;
   }
 
   create() {
@@ -298,10 +301,10 @@ class GameScene extends Phaser.Scene {
     fruit.setCircle(30);
     fruit.sliced = false;
     fruit.sliceCooldownUntil = 0;
-    
-    // Enable smooth HD rendering for this sprite
-    if (fruit.texture) {
-      fruit.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+
+    // Launch "popup" sound for fruits (not bombs)
+    if (!isBomb) {
+      this.playSfx("popup", { volume: 0.25, rate: Phaser.Math.FloatBetween(0.97, 1.03) });
     }
 
     // Horizontal velocity (random direction left or right)
@@ -426,9 +429,29 @@ class GameScene extends Phaser.Scene {
     fruit.sliced = true;
 
     if (fruit.isBomb) {
-      this.playSfx("gameover");
-      this.cameras.main.shake(200, 0.02);
-      this.missFruit(fruit);
+      this.playSfx("bomb", { volume: 0.7 });
+      // Sequence: flash -> shake -> game over
+      if (this._bombGameOverTriggered) return;
+      this._bombGameOverTriggered = true;
+
+      // Freeze gameplay during the effects
+      this.isPaused = true;
+      this.physics.pause();
+      if (this.spawnTimer) this.spawnTimer.remove(false);
+
+      fruit.destroy();
+
+      const flashMs = 160;
+      const shakeMs = 220;
+      this.cameras.main.flash(flashMs, 255, 255, 255);
+
+      this.time.delayedCall(flashMs, () => {
+        this.cameras.main.shake(shakeMs, 0.02);
+      });
+
+      this.time.delayedCall(flashMs + shakeMs, () => {
+        this.gameOver();
+      });
       return;
     }
 
@@ -436,9 +459,12 @@ class GameScene extends Phaser.Scene {
     this.comboCount++;
     this.scheduleComboFinalize();
 
-    const comboMultiplier = this.comboCount > 1 ? this.comboCount : 1;
-    this.score += fruit.fruitScore * comboMultiplier;
+    // Score: always +1 per fruit sliced (no fruit-type points, no combo multiplier)
+    this.score += 1;
     this.emitGameState();
+
+    // Spawn a floating "+1" from the fruit position
+    this.spawnPointPopup(fruit.x, fruit.y, "+1");
 
     // Create juice splash effect
     this.createJuiceSplash(fruit.x, fruit.y, fruit.fruitColor || 0xff4d6d);
@@ -456,89 +482,127 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  spawnPointPopup(x, y, text) {
+    const { width, height } = this.scale;
+    const fontSize = ScaleManager?.fontSize ? ScaleManager.fontSize(32, width, height) : 28;
+
+    const popup = this.add.text(x, y, text, {
+      fontFamily: "Arial Black",
+      fontSize: `${fontSize}px`,
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 6
+    }).setOrigin(0.5).setDepth(1001);
+
+    popup.setScale(0.6);
+    popup.setAlpha(0.0);
+
+    this.tweens.add({
+      targets: popup,
+      y: y - Math.max(60, height * 0.05),
+      alpha: 1,
+      scale: 1,
+      duration: 180,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        this.tweens.add({
+          targets: popup,
+          alpha: 0,
+          duration: 420,
+          ease: "Quad.easeIn",
+          onComplete: () => popup.destroy()
+        });
+      }
+    });
+  }
+
   createSlicedHalves(fruit, x1, y1, x2, y2) {
     const textureKey = fruit.texture.key;
-    const frame = fruit.frame.name;
+    const frame = fruit.frame?.name;
     const x = fruit.x;
     const y = fruit.y;
     const scale = fruit.scaleX;
     const rotation = fruit.rotation;
-    
-    // Get original texture dimensions
+
+    const { width, height } = this.scale;
+    const screenScale = Math.min(width, height) / 720;
+
+    // Get original texture dimensions (unscaled)
     const texW = fruit.width;
     const texH = fruit.height;
-    
-    // Calculate slice angle from swipe direction
+
+    // Slice normal (perpendicular to swipe)
     const sliceAngle = Math.atan2(y2 - y1, x2 - x1);
     const perpAngle = sliceAngle + Math.PI / 2;
-    
-    // Create left half
-    const leftHalf = this.add.image(x, y, textureKey, frame);
-    leftHalf.setScale(scale);
-    leftHalf.setRotation(rotation);
-    leftHalf.setDepth(15);
-    leftHalf.setCrop(0, 0, texW / 2, texH);
-    leftHalf.setOrigin(1, 0.5);
-    
-    // Create right half
-    const rightHalf = this.add.image(x, y, textureKey, frame);
-    rightHalf.setScale(scale);
-    rightHalf.setRotation(rotation);
-    rightHalf.setDepth(15);
-    rightHalf.setCrop(texW / 2, 0, texW / 2, texH);
-    rightHalf.setOrigin(0, 0.5);
-    
-    // Phase 1: Quick "pop" apart with slight upward motion (the jerk feeling)
-    const popDistance = 20;
-    const popUp = 30;
-    
-    // Left half - pop apart
-    this.tweens.add({
-      targets: leftHalf,
-      x: x + Math.cos(perpAngle + Math.PI) * popDistance,
-      y: y - popUp,
-      rotation: rotation - 0.3,
-      duration: 80,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        // Phase 2: Fall with gravity and spin
-        this.tweens.add({
-          targets: leftHalf,
-          x: leftHalf.x + Math.cos(perpAngle + Math.PI) * 80 + Phaser.Math.Between(-30, 30),
-          y: leftHalf.y + 350,
-          rotation: rotation - 3,
-          alpha: 0,
-          scale: scale * 0.5,
-          duration: 800,
-          ease: 'Quad.easeIn',
-          onComplete: () => leftHalf.destroy()
-        });
+    const nx = Math.cos(perpAngle);
+    const ny = Math.sin(perpAngle);
+
+    // Inherit the fruit's motion so the cut feels continuous
+    const baseVx = fruit.body?.velocity?.x || 0;
+    const baseVy = fruit.body?.velocity?.y || 0;
+
+    const gravity = this.difficulty.getGravity(height);
+    // Keep pieces close to the cut point (more "juicey" and less floaty)
+    const push = (120 + Phaser.Math.Between(-25, 25)) * screenScale;
+    const lift = (70 + Phaser.Math.Between(-20, 20)) * screenScale; // small upward impulse
+    const maxExtraSpeed = 420 * screenScale;
+
+    const makeHalf = (isLeft) => {
+      const half = this.physics.add.image(x, y, textureKey, frame);
+      half.setScale(scale);
+      half.setRotation(rotation);
+      half.setDepth(15);
+      half.setAlpha(1);
+
+      // Crop to half texture
+      if (isLeft) {
+        half.setCrop(0, 0, texW / 2, texH);
+        half.setOrigin(1, 0.5);
+      } else {
+        half.setCrop(texW / 2, 0, texW / 2, texH);
+        half.setOrigin(0, 0.5);
       }
-    });
-    
-    // Right half - pop apart
-    this.tweens.add({
-      targets: rightHalf,
-      x: x + Math.cos(perpAngle) * popDistance,
-      y: y - popUp,
-      rotation: rotation + 0.3,
-      duration: 80,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        // Phase 2: Fall with gravity and spin
-        this.tweens.add({
-          targets: rightHalf,
-          x: rightHalf.x + Math.cos(perpAngle) * 80 + Phaser.Math.Between(-30, 30),
-          y: rightHalf.y + 350,
-          rotation: rotation + 3,
-          alpha: 0,
-          scale: scale * 0.5,
-          duration: 800,
-          ease: 'Quad.easeIn',
-          onComplete: () => rightHalf.destroy()
-        });
+
+      // Physics tuning: mild damping + gravity, small angular velocity
+      half.body.setAllowGravity(true);
+      half.body.setGravityY(gravity);
+      // Arcade: damping uses drag coefficient (0..1). Keep it subtle.
+      half.body.setDamping(true);
+      half.body.setDrag(0.35);
+
+      // Small separation impulse along the slice normal
+      const dir = isLeft ? -1 : 1;
+      let vx = baseVx + dir * nx * push + Phaser.Math.Between(-20, 20) * screenScale;
+      let vy = baseVy + dir * ny * push - lift;
+
+      // Clamp to avoid pieces flying across the whole screen
+      const mag = Math.sqrt(vx * vx + vy * vy) || 1;
+      if (mag > maxExtraSpeed) {
+        const s = maxExtraSpeed / mag;
+        vx *= s;
+        vy *= s;
       }
-    });
+      half.body.setVelocity(vx, vy);
+
+      half.setAngularVelocity(Phaser.Math.Between(-180, 180));
+
+      // Fade out (no forced downward tween / no forced rotation tween)
+      this.time.delayedCall(420, () => {
+        if (!half.active) return;
+        this.tweens.add({
+          targets: half,
+          alpha: 0,
+          duration: 360,
+          ease: "Quad.easeIn",
+          onComplete: () => { if (half.active) half.destroy(); }
+        });
+      });
+
+      return half;
+    };
+
+    makeHalf(true);
+    makeHalf(false);
   }
 
   createJuiceSplash(x, y, color) {

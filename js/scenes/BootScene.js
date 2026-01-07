@@ -74,6 +74,11 @@ class BootScene extends Phaser.Scene {
     // Audio - load from assets/audio folder
     this.load.audio("sfx_slice", "assets/audio/slice.wav");
     this.load.audio("sfx_whoosh", "assets/audio/whoosh.wav");
+    this.load.audio("sfx_popup", "assets/audio/popup.wav");
+    this.load.audio("sfx_miss", "assets/audio/miss.wav");
+    this.load.audio("sfx_bomb", "assets/audio/bomb.wav");
+    // Background music (looping)
+    this.load.audio("bgm", "assets/audio/bg.wav");
   }
 
   create() {
@@ -92,8 +97,20 @@ class BootScene extends Phaser.Scene {
       
       this.registry.set("audioLoaded", {
         slice: this.loadedAudio.has("sfx_slice"),
-        whoosh: this.loadedAudio.has("sfx_whoosh")
+        whoosh: this.loadedAudio.has("sfx_whoosh"),
+        popup: this.loadedAudio.has("sfx_popup"),
+        miss: this.loadedAudio.has("sfx_miss"),
+        bomb: this.loadedAudio.has("sfx_bomb"),
+        bgm: this.loadedAudio.has("bgm")
       });
+
+      // Create (and try to start) background music once. It will keep playing across scenes.
+      // Note: some browsers block autoplay; it will start on first user interaction (see MenuScene).
+      const existingBgm = this.sound.get("bgm");
+      if (!existingBgm && this.cache.audio.exists("bgm")) {
+        const bgm = this.sound.add("bgm", { loop: true, volume: 0.18 });
+        if (this.sound.context?.state !== "suspended") bgm.play();
+      }
       
       this.scene.start("MenuScene");
     } catch (err) {
